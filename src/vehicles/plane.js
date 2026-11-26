@@ -3,12 +3,9 @@
 import { Assembly, S, SIDES, boltCircle, boltRow, axisRot, airfoil, wedge } from '../core/builder.js';
 import { wheel } from '../core/parts.js';
 
-export const PLANE_TYPES = {
-  monomoteur: {
-    label: 'Monomoteur léger à aile haute', desc: 'Avion école / tourisme 4 places',
-    makers: ['Cessna (172 Skyhawk)', 'Piper (PA-28 – aile basse)', 'Robin (DR400 – aile basse bois)', 'Diamond (DA40 – composite)', 'Cirrus (SR22 – parachute cellule)', 'Tecnam (P2010)'],
-  },
-};
+import { PLANE_TYPES } from './meta/plane.js';
+
+export { PLANE_TYPES };
 
 const WHITE = 0xf3f3f1, STRIPE = 0x1b3d7a;
 const FY = 1300; // axe du fuselage

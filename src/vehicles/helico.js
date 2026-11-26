@@ -2,12 +2,9 @@
 // Longueur fuselage 10 900 mm (rotors tournants 12 900 mm) · rotor principal Ø10 700 mm · hauteur 3 300 mm
 import { Assembly, S, SIDES, boltCircle, axisRot, airfoil } from '../core/builder.js';
 
-export const HELI_TYPES = {
-  helicoptere: {
-    label: 'Hélicoptère léger monoturbine', desc: 'Hélicoptère utilitaire 6 places – turbine 630 kW – rotor tripale',
-    makers: ['Airbus Helicopters (H125 / H130)', 'Bell (505 / 407)', 'Leonardo (AW119)', 'Robinson (R66 – piston R44)', 'MD Helicopters (MD 530)', 'Sikorsky / Airbus (bimoteurs lourds)'],
-  },
-};
+import { HELI_TYPES } from './meta/helico.js';
+
+export { HELI_TYPES };
 
 export function buildHelico() {
   const PAINT = 0xd4202a, DARK = 0x222428;

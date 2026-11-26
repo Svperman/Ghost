@@ -1,38 +1,56 @@
-// Catalogue des véhicules : catégories → types → générateur 3D
-import { buildCar, CAR_TYPES } from './vehicles/car.js';
-import { buildTruck, TRUCK_TYPES } from './vehicles/truck.js';
-import { buildMoto, MOTO_TYPES } from './vehicles/moto.js';
-import { buildPlane, PLANE_TYPES } from './vehicles/plane.js';
-import { buildJet, JET_TYPES } from './vehicles/jet.js';
-import { buildHelico, HELI_TYPES } from './vehicles/helico.js';
-import { buildBus, BUS_TYPES } from './vehicles/bus.js';
-import { buildVan, VAN_TYPES } from './vehicles/van.js';
-import { buildTractor, TRACTOR_TYPES } from './vehicles/tractor.js';
-import { buildLight, LIGHT_TYPES } from './vehicles/light.js';
-import { buildBike, BIKE_TYPES } from './vehicles/bike.js';
-import { buildBoat, BOAT_TYPES } from './vehicles/boat.js';
-import { buildTrain, TRAIN_TYPES } from './vehicles/train.js';
+// Catalogue des véhicules : catégories → types → générateur 3D.
+// Les fiches (libellés, constructeurs…) sont chargées tout de suite ; le code 3D de chaque famille
+// n'est téléchargé que lorsqu'un de ses véhicules est affiché (import dynamique = fichier séparé).
+import { CAR_TYPES } from './vehicles/meta/car.js';
+import { TRUCK_TYPES } from './vehicles/meta/truck.js';
+import { MOTO_TYPES } from './vehicles/meta/moto.js';
+import { PLANE_TYPES } from './vehicles/meta/plane.js';
+import { JET_TYPES } from './vehicles/meta/jet.js';
+import { HELI_TYPES } from './vehicles/meta/helico.js';
+import { BUS_TYPES } from './vehicles/meta/bus.js';
+import { VAN_TYPES } from './vehicles/meta/van.js';
+import { TRACTOR_TYPES } from './vehicles/meta/tractor.js';
+import { LIGHT_TYPES } from './vehicles/meta/light.js';
+import { BIKE_TYPES } from './vehicles/meta/bike.js';
+import { BOAT_TYPES } from './vehicles/meta/boat.js';
+import { TRAIN_TYPES } from './vehicles/meta/train.js';
 
-const from = (types, build) => Object.fromEntries(Object.entries(types).map(([k, t]) => [k, { ...t, build: () => build(k) }]));
+/** Associe chaque type à un générateur chargé à la demande (build renvoie une promesse) */
+const lazy = (types, load, fn, keys = Object.keys(types)) =>
+  Object.fromEntries(keys.map((k) => [k, { ...types[k], build: async () => (await load())[fn](k) }]));
+
+const car = () => import('./vehicles/car.js');
+const truck = () => import('./vehicles/truck.js');
+const moto = () => import('./vehicles/moto.js');
+const plane = () => import('./vehicles/plane.js');
+const jet = () => import('./vehicles/jet.js');
+const helico = () => import('./vehicles/helico.js');
+const bus = () => import('./vehicles/bus.js');
+const van = () => import('./vehicles/van.js');
+const tractor = () => import('./vehicles/tractor.js');
+const light = () => import('./vehicles/light.js');
+const bike = () => import('./vehicles/bike.js');
+const boat = () => import('./vehicles/boat.js');
+const train = () => import('./vehicles/train.js');
 
 export const CATALOG = {
   avion: {
     label: 'Aéronefs', icon: '✈️',
     types: {
-      monomoteur: { ...PLANE_TYPES.monomoteur, build: buildPlane },
-      ...from(JET_TYPES, buildJet),
-      helicoptere: { ...HELI_TYPES.helicoptere, build: buildHelico },
+      monomoteur: { ...PLANE_TYPES.monomoteur, build: async () => (await plane()).buildPlane() },
+      ...lazy(JET_TYPES, jet, 'buildJet'),
+      helicoptere: { ...HELI_TYPES.helicoptere, build: async () => (await helico()).buildHelico() },
     },
   },
-  voiture: { label: 'Voitures', icon: '🚗', types: from(CAR_TYPES, buildCar) },
-  utilitaire: { label: 'Utilitaires', icon: '🚐', types: from(VAN_TYPES, buildVan) },
-  camion: { label: 'Camions', icon: '🚚', types: from(TRUCK_TYPES, buildTruck) },
-  bus: { label: 'Bus & cars', icon: '🚌', types: from(BUS_TYPES, buildBus) },
-  agricole: { label: 'Agricole', icon: '🚜', types: from(TRACTOR_TYPES, buildTractor) },
-  moto: { label: 'Motos & quads', icon: '🏍️', types: { ...from(MOTO_TYPES, buildMoto), ...from(LIGHT_TYPES, buildLight) } },
-  velo: { label: 'Vélos', icon: '🚲', types: from(BIKE_TYPES, buildBike) },
-  bateau: { label: 'Bateaux', icon: '⛵', types: from(BOAT_TYPES, buildBoat) },
-  train: { label: 'Ferroviaire', icon: '🚆', types: from(TRAIN_TYPES, buildTrain) },
+  voiture: { label: 'Voitures', icon: '🚗', types: lazy(CAR_TYPES, car, 'buildCar') },
+  utilitaire: { label: 'Utilitaires', icon: '🚐', types: lazy(VAN_TYPES, van, 'buildVan') },
+  camion: { label: 'Camions', icon: '🚚', types: lazy(TRUCK_TYPES, truck, 'buildTruck') },
+  bus: { label: 'Bus & cars', icon: '🚌', types: lazy(BUS_TYPES, bus, 'buildBus') },
+  agricole: { label: 'Agricole', icon: '🚜', types: lazy(TRACTOR_TYPES, tractor, 'buildTractor') },
+  moto: { label: 'Motos & quads', icon: '🏍️', types: { ...lazy(MOTO_TYPES, moto, 'buildMoto'), ...lazy(LIGHT_TYPES, light, 'buildLight') } },
+  velo: { label: 'Vélos', icon: '🚲', types: lazy(BIKE_TYPES, bike, 'buildBike') },
+  bateau: { label: 'Bateaux', icon: '⛵', types: lazy(BOAT_TYPES, boat, 'buildBoat') },
+  train: { label: 'Ferroviaire', icon: '🚆', types: lazy(TRAIN_TYPES, train, 'buildTrain') },
   // Modèles .glb importés par l'utilisateur (remplis à l'exécution)
   import: { label: 'Importés', icon: '📦', types: {}, hidden: true },
 };

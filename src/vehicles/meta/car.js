@@ -1,0 +1,60 @@
+// Fiches descriptives des types (car) – chargées au démarrage, sans le générateur 3D
+export const CAR_TYPES = {
+  citadine: {
+    label: 'Citadine', desc: 'Citadine 5 portes – traction – 3 cylindres 1,0 L turbo',
+    L: 3990, W: 1730, H: 1480, WB: 2500, fo: 780, track: 1500, tire: [185, 65, 15], clear: 150, belt: 930, nose: 760,
+    rear: 'hatch', doors: 4, rake: 32, paint: 0xd7472a, drive: 'FWD', eng: { n: 3, bore: 71.9, stroke: 82, pitch: 80, label: '1,0 L 3 cylindres turbo essence', kw: 74, turbo: true },
+    rows: 2, disc: [[266, 22], [249, 10]],
+    makers: ['Renault (Clio)', 'Peugeot (208)', 'Volkswagen (Polo)', 'Toyota (Yaris)', 'Fiat (500)', 'Citroën (C3)', 'Dacia (Sandero)', 'Hyundai (i20)'],
+  },
+  berline: {
+    label: 'Berline', desc: 'Berline compacte 4 portes – traction – 4 cylindres 1,6 L',
+    L: 4520, W: 1780, H: 1440, WB: 2700, fo: 900, track: 1550, tire: [205, 55, 16], clear: 150, belt: 950, nose: 790,
+    rear: 'tri', doors: 4, rake: 38, paint: 0x1d5fa8, drive: 'FWD', eng: { n: 4, bore: 79, stroke: 81.4, pitch: 88, label: '1,6 L 4 cylindres essence', kw: 85 },
+    rows: 2, disc: [[283, 26], [268, 12]],
+    makers: ['Peugeot (508)', 'Toyota (Corolla)', 'Volkswagen (Passat)', 'BMW (Série 3)', 'Mercedes-Benz (Classe C)', 'Audi (A4)', 'Skoda (Octavia)', 'Honda (Civic)'],
+  },
+  break: {
+    label: 'Break', desc: 'Break familial – traction – 4 cylindres 2,0 L diesel',
+    L: 4780, W: 1830, H: 1480, WB: 2790, fo: 920, track: 1580, tire: [215, 55, 17], clear: 155, belt: 960, nose: 800,
+    rear: 'wagon', doors: 4, rake: 36, paint: 0x5b6670, drive: 'FWD', eng: { n: 4, bore: 81, stroke: 95.5, pitch: 88, label: '2,0 L 4 cylindres diesel', kw: 110, diesel: true },
+    rows: 2, disc: [[312, 25], [272, 10]], roofBars: true,
+    makers: ['Volkswagen (Passat SW)', 'Skoda (Superb Combi)', 'Peugeot (308 SW)', 'Volvo (V60)', 'Audi (A6 Avant)', 'Mercedes-Benz (Classe E Break)'],
+  },
+  suv: {
+    label: 'SUV 4×4', desc: 'SUV familial – transmission intégrale – 4 cylindres 2,0 L',
+    L: 4600, W: 1870, H: 1690, WB: 2730, fo: 900, track: 1600, tire: [235, 55, 19], clear: 210, belt: 1110, nose: 960,
+    rear: 'wagon', doors: 4, rake: 34, paint: 0x2e4a3c, drive: 'AWD', eng: { n: 4, bore: 82.5, stroke: 92.8, pitch: 90, label: '2,0 L 4 cylindres turbo essence', kw: 140, turbo: true },
+    rows: 2, disc: [[340, 30], [300, 12]], roofBars: true, flares: true,
+    makers: ['Toyota (RAV4)', 'Peugeot (3008)', 'Volkswagen (Tiguan)', 'Jeep (Compass)', 'Land Rover (Discovery Sport)', 'Hyundai (Tucson)', 'Kia (Sportage)', 'BMW (X3)'],
+  },
+  monospace: {
+    label: 'Monospace 7 places', desc: 'Monospace 7 places – traction – 4 cylindres 1,5 L diesel',
+    L: 4760, W: 1850, H: 1750, WB: 2900, fo: 930, track: 1590, tire: [215, 60, 17], clear: 165, belt: 1080, nose: 900,
+    rear: 'wagon', doors: 4, rake: 28, paint: 0x8a1f2d, drive: 'FWD', eng: { n: 4, bore: 75, stroke: 84.8, pitch: 84, label: '1,5 L 4 cylindres diesel', kw: 96, diesel: true },
+    rows: 3, disc: [[304, 26], [268, 12]],
+    makers: ['Renault (Espace)', 'Citroën (C4 SpaceTourer)', 'Volkswagen (Touran)', 'Ford (S-Max)', 'Toyota (Sienna)', 'Kia (Carnival)'],
+  },
+  coupe: {
+    label: 'Coupé sportif', desc: 'Coupé 2+2 – propulsion – 6 cylindres en ligne 3,0 L biturbo',
+    L: 4450, W: 1890, H: 1300, WB: 2700, fo: 870, track: 1600, tire: [255, 35, 19], clear: 120, belt: 840, nose: 640,
+    rear: 'fast', doors: 2, rake: 26, paint: 0xe3b505, drive: 'RWD', eng: { n: 6, bore: 84, stroke: 90, pitch: 91, label: '3,0 L 6 cylindres en ligne biturbo', kw: 331, turbo: true },
+    rows: 2, disc: [[380, 34], [370, 28]],
+    makers: ['BMW (M4)', 'Ford (Mustang)', 'Chevrolet (Camaro)', 'Nissan (Z)', 'Toyota (GR Supra)', 'Porsche (911 – moteur arrière)', 'Alpine (A110 – moteur central)'],
+  },
+  pickup: {
+    label: 'Pick-up double cabine', desc: 'Pick-up double cabine sur châssis échelle – 4×4 – 4 cylindres 2,8 L diesel',
+    L: 5330, W: 1855, H: 1815, WB: 3085, fo: 930, track: 1550, tire: [265, 65, 17], clear: 235, belt: 1250, nose: 1080,
+    rear: 'pickup', doors: 4, rake: 32, paint: 0xb8babd, drive: 'AWD', frame: true, leaf: true, flares: true,
+    eng: { n: 4, bore: 92, stroke: 103.6, pitch: 98, label: '2,8 L 4 cylindres turbo diesel', kw: 150, diesel: true, turbo: true },
+    rows: 2, disc: [[319, 28], [295, 50]], drumRear: true,
+    makers: ['Toyota (Hilux)', 'Ford (Ranger / F-150)', 'Mitsubishi (L200)', 'Nissan (Navara)', 'Isuzu (D-Max)', 'Volkswagen (Amarok)', 'RAM (1500)'],
+  },
+  electrique: {
+    label: 'Électrique', desc: 'Berline électrique – propulsion – moteur synchrone 210 kW – batterie 75 kWh',
+    L: 4690, W: 1850, H: 1440, WB: 2875, fo: 850, track: 1580, tire: [235, 45, 18], clear: 140, belt: 960, nose: 720,
+    rear: 'fast', doors: 4, rake: 26, paint: 0xf0f0ee, drive: 'EV', eng: null,
+    rows: 2, disc: [[320, 28], [335, 20]],
+    makers: ['Tesla (Model 3)', 'Renault (Mégane E-Tech)', 'Volkswagen (ID.3)', 'Hyundai (Ioniq 6)', 'BYD (Seal)', 'Kia (EV6)', 'Peugeot (e-308)', 'Polestar (2)'],
+  },
+};

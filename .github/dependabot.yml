@@ -1,0 +1,13 @@
+# Propose automatiquement (pull requests) les mises à jour de three.js, Vite et des autres dépendances
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      dependances:
+        patterns: ["*"]
+        update-types: [minor, patch]

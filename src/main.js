@@ -4,9 +4,9 @@ import { TransformControls } from 'three/examples/jsm/controls/TransformControls
 import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import './style.css';
+import { inject } from '@vercel/analytics';
 import { CATALOG, DEFAULT_TYPE } from './catalog.js';
 import { LAYERS } from './core/builder.js';
-import { readModelFile, gltfToAssembly } from './core/importer.js';
 
 const LAYER_STEPS = ['Tout afficher', 'Sans carrosserie', 'Sans intérieur', 'Sans mécanique', 'Châssis seul'];
 const layerIndex = (id) => Math.max(0, LAYERS.findIndex((l) => l.id === id));
@@ -30,6 +30,11 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
 viewport.prepend(renderer.domElement);
+renderer.domElement.setAttribute('role', 'img');
+renderer.domElement.setAttribute('aria-label', 'Vue 3D du véhicule : faites glisser pour tourner, molette pour zoomer, clic pour sélectionner une pièce');
+
+// Mesure d'audience Vercel Web Analytics : sans cookie, sans donnée personnelle (actif seulement en production)
+inject({ mode: import.meta.env.PROD ? 'production' : 'development', debug: false });
 
 const labelRenderer = new CSS2DRenderer();
 labelRenderer.domElement.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;';
@@ -95,22 +100,33 @@ function renderTabs() {
   });
 }
 renderTabs();
+let loadToken = 0;
 function loadVehicle(cat, type) {
   if (!CATALOG[cat] || !Object.keys(CATALOG[cat].types).length) cat = 'voiture';
   if (!CATALOG[cat].types[type]) type = firstType(cat);
   const key = `${cat}/${type}`;
+  $('#loading').textContent = 'Construction du modèle…';
   $('#loading').style.display = 'grid';
   document.querySelectorAll('#vehicle-tabs button').forEach((b) => b.classList.toggle('active', b.dataset.v === cat));
   fillTypeSelect(cat, type);
-  requestAnimationFrame(() => setTimeout(() => {
+  const token = ++loadToken;
+  requestAnimationFrame(() => setTimeout(async () => {
+    const t0 = performance.now();
+    let asm;
+    try {
+      asm = await CATALOG[cat].types[type].build();
+    } catch (err) {
+      console.error(err);
+      if (token === loadToken) $('#loading').textContent = 'Échec du chargement du modèle – vérifiez la connexion puis rechargez la page.';
+      return;
+    }
+    if (token !== loadToken) { asm.object.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } }); return; }
     if (state.root) {
       gizmo.detach();
       scene.remove(state.root);
       state.root.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
     }
     clearMeasure();
-    const t0 = performance.now();
-    const asm = CATALOG[cat].types[type].build();
     state.key = key; state.cat = cat; state.type = type;
     state.root = asm.object;
     state.rootNode = asm.node;
@@ -797,6 +813,7 @@ async function importFile(file) {
   $('#loading').textContent = `Lecture de « ${file.name} »…`;
   $('#loading').style.display = 'grid';
   try {
+    const { readModelFile, gltfToAssembly } = await import('./core/importer.js');
     const res = await readModelFile(file);
     const id = `m${++importSeq}`;
     const label = file.name.replace(/\.(glb|gltf)$/i, '');

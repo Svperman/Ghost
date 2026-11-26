@@ -126,3 +126,31 @@ cabriolet: {
 
 Toutes les cotes sont en millimètres. Repère : X vers l'avant, Y vers le haut, Z vers la droite, origine au sol.
 Si vous disposez des cotes réelles d'un modèle précis, il suffit de les saisir dans une nouvelle entrée.
+
+## Mise en ligne (Vercel)
+
+1. Sur [vercel.com](https://vercel.com), **Add New → Project**, importez le dépôt GitHub `ghost`, branche de production au choix. Vercel lit `vercel.json` : rien d'autre à régler.
+2. Dans le projet Vercel : **Analytics → Enable** (mesure d'audience sans cookie). Tant que ce n'est pas activé, la console affiche une erreur 404 sur `/_vercel/insights/script.js`, sans conséquence.
+3. Domaine : achetez-le (par exemple chez Cloudflare), ajoutez-le dans **Settings → Domains**, puis remplacez l'adresse dans `.env` (`VITE_SITE_URL`) et poussez : balises de partage, adresse canonique, `robots.txt` et `sitemap.xml` se mettent à jour.
+4. Déclarez `https://votre-domaine/sitemap.xml` dans [Google Search Console](https://search.google.com/search-console).
+
+### Ce qui est déjà en place
+
+| Point | Où |
+|---|---|
+| HTTPS forcé + HSTS, en-têtes de sécurité (CSP, anti-iframe, etc.) | `vercel.json` |
+| Aucune clé API côté navigateur, aucun serveur | – |
+| Pages légales : mentions légales, confidentialité, CGU | `mentions-legales.html`, `confidentialite.html`, `cgu.html` |
+| Page 404 personnalisée | `404.html` |
+| Titre, description, adresse canonique, données structurées | `index.html` |
+| Image de partage 1200 × 630, favicon, icône iPhone | `public/` |
+| `robots.txt` et `sitemap.xml` générés au build | `vite.config.js` |
+| Mesure d'audience sans cookie (donc pas de bandeau cookies) | `src/main.js` (`@vercel/analytics`) |
+| Code chargé à la demande : chaque famille de véhicules est un fichier séparé | `src/catalog.js` |
+| Contraste des couleurs conforme WCAG AA, focus clavier visible | `src/style.css` |
+| Mises à jour de dépendances proposées chaque semaine | `.github/dependabot.yml` |
+
+### À compléter avant publication
+
+- Dans `mentions-legales.html` et `confidentialite.html`, remplacez les zones **[À compléter : …]** (identité de l'éditeur, adresse, e-mail de contact).
+- L'adresse du site dans `.env` une fois le domaine choisi.

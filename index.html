@@ -3,10 +3,35 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Ghost – Explorateur 3D de pièces</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='12' fill='none' stroke='%233d8bff' stroke-width='4'/><circle cx='16' cy='16' r='4' fill='%233d8bff'/></svg>" />
+  <title>Ghost – Explorateur 3D de pièces de véhicules (cotes en mm)</title>
+  <meta name="description" content="Explorez pièce par pièce 43 types de véhicules en 3D : avions, voitures, camions, bus, tracteurs, motos, vélos, bateaux et trains. Cotes en mm, visserie ISO, vue éclatée. Gratuit." />
+  <link rel="canonical" href="%VITE_SITE_URL%/" />
+  <meta name="theme-color" content="#0f1216" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+  <!-- Aperçu sur les réseaux sociaux (Open Graph / X) -->
+  <meta property="og:type" content="website" />
+  <meta property="og:locale" content="fr_FR" />
+  <meta property="og:site_name" content="%VITE_SITE_NAME%" />
+  <meta property="og:title" content="Ghost – Explorez les véhicules pièce par pièce en 3D" />
+  <meta property="og:description" content="43 types de véhicules démontables en 3D, de la carrosserie au châssis : cotes en mm, visserie, vue éclatée. Importez aussi vos propres modèles .glb." />
+  <meta property="og:url" content="%VITE_SITE_URL%/" />
+  <meta property="og:image" content="%VITE_SITE_URL%/og-image.jpg" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="Un SUV en 3D dont la carrosserie est retirée pour montrer le moteur, les sièges et les suspensions" />
+  <meta name="twitter:card" content="summary_large_image" />
+
+  <!-- Données structurées : application web gratuite -->
+  <script type="application/ld+json">
+  {"@context":"https://schema.org","@type":"WebApplication","name":"Ghost – Explorateur 3D de pièces","url":"%VITE_SITE_URL%/","applicationCategory":"EducationalApplication","operatingSystem":"Navigateur web","inLanguage":"fr","offers":{"@type":"Offer","price":"0","priceCurrency":"EUR"}}
+  </script>
 </head>
 <body>
+  <noscript><p style="padding:70px 20px;color:#e4e8ee">Ghost est un explorateur 3D : activez JavaScript (et WebGL) pour afficher les véhicules.</p></noscript>
+  <h1 class="sr-only">Ghost – explorateur 3D des pièces de véhicules</h1>
   <header id="topbar">
     <div class="brand"><span class="logo">◎</span> GHOST <small>Explorateur 3D de pièces</small></div>
     <nav id="vehicle-tabs" aria-label="Véhicules"></nav>
@@ -72,6 +97,9 @@
       </ul>
     </div>
     <div id="details-content" hidden></div>
+    <nav id="legal-links" aria-label="Informations légales">
+      <a href="/mentions-legales">Mentions légales</a><a href="/confidentialite">Confidentialité</a><a href="/cgu">CGU</a>
+    </nav>
   </aside>
 
   <div id="help" hidden>
