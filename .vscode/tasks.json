@@ -1,0 +1,19 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Ghost : lancer le serveur (npm run dev)",
+      "type": "npm",
+      "script": "dev",
+      "isBackground": true,
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": {
+        "owner": "vite",
+        "pattern": { "regexp": "^x$" },
+        "background": { "activeBegins": true, "beginsPattern": "VITE", "endsPattern": "Local:" }
+      }
+    },
+    { "label": "Ghost : build de production", "type": "npm", "script": "build", "group": "build" },
+    { "label": "Ghost : installer les dépendances", "type": "shell", "command": "npm install" }
+  ]
+}

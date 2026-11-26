@@ -1,0 +1,18 @@
+{
+  "name": "ghost-explorateur-3d",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Explorateur 3D des pièces d'avions, voitures, camions et motos (cotes en millimètres)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "three": "^0.187.0"
+  },
+  "devDependencies": {
+    "vite": "^8.3.8"
+  }
+}

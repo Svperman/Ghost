@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ghost – Explorateur 3D de pièces</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='12' fill='none' stroke='%233d8bff' stroke-width='4'/><circle cx='16' cy='16' r='4' fill='%233d8bff'/></svg>" />
+</head>
+<body>
+  <header id="topbar">
+    <div class="brand"><span class="logo">◎</span> GHOST <small>Explorateur 3D de pièces</small></div>
+    <nav id="vehicle-tabs" aria-label="Véhicules">
+      <button data-v="avion">✈️ <span>Avion</span></button>
+      <button data-v="voiture">🚗 <span>Voiture</span></button>
+      <button data-v="camion">🚚 <span>Camion</span></button>
+      <button data-v="moto">🏍️ <span>Moto</span></button>
+    </nav>
+    <div id="stats"></div>
+  </header>
+
+  <aside id="sidebar">
+    <div class="search">
+      <input id="search" type="search" placeholder="Rechercher une pièce (ex : boulon, piston, étrier…)" autocomplete="off" />
+      <div id="search-info"></div>
+    </div>
+    <div class="tree-actions">
+      <button id="btn-expand" title="Tout déplier">⊞ Déplier</button>
+      <button id="btn-collapse" title="Tout replier">⊟ Replier</button>
+      <button id="btn-showall" title="Tout afficher">👁 Tout afficher</button>
+    </div>
+    <div id="tree" role="tree"></div>
+  </aside>
+
+  <main id="viewport">
+    <div id="loading">Construction du modèle…</div>
+    <div id="tooltip"></div>
+    <div id="measure-hint"></div>
+    <div id="toolbar">
+      <label class="slider" title="Vue éclatée (E)">💥 Éclatement
+        <input id="explode" type="range" min="0" max="100" value="0" />
+      </label>
+      <button class="toggle" id="t-xray" title="Rayons X : rend transparent tout sauf la sélection (X)">🩻 Rayons X</button>
+      <button class="toggle" id="t-wire" title="Affichage filaire (W)">🕸 Filaire</button>
+      <button class="toggle" id="t-dims" title="Cotes d'encombrement de la sélection (C)">📏 Cotes</button>
+      <button class="toggle" id="t-labels" title="Étiquettes des sous-ensembles (L)">🏷 Étiquettes</button>
+      <button class="toggle" id="t-measure" title="Mesurer une distance entre deux points (M)">📐 Mesurer</button>
+      <span class="sep"></span>
+      <button id="v-iso" title="Vue 3/4">3/4</button>
+      <button id="v-front" title="Vue de face">Face</button>
+      <button id="v-side" title="Vue de côté">Côté</button>
+      <button id="v-top" title="Vue de dessus">Dessus</button>
+      <span class="sep"></span>
+      <button id="b-shot" title="Capture d'écran PNG">📷</button>
+      <button id="b-csv" title="Exporter la nomenclature (CSV)">📄 Nomenclature</button>
+      <button id="b-help" title="Aide (?)">?</button>
+    </div>
+  </main>
+
+  <aside id="details">
+    <div id="details-empty">
+      <h2>Aucune pièce sélectionnée</h2>
+      <p>Cliquez sur une pièce dans la vue 3D ou dans l'arborescence.</p>
+      <ul class="tips">
+        <li><b>Clic</b> : sélectionner · <b>double-clic</b> : centrer</li>
+        <li><b>Clic répété</b> au même endroit : pièce suivante derrière</li>
+        <li><b>Clic gauche glissé</b> : tourner · <b>droit</b> : déplacer · <b>molette</b> : zoom</li>
+        <li><b>G</b> déplacer la pièce · <b>R</b> pivoter · <b>Échap</b> désélectionner</li>
+        <li><b>I</b> isoler · <b>H</b> masquer · <b>F</b> centrer · <b>X</b> rayons X</li>
+      </ul>
+    </div>
+    <div id="details-content" hidden></div>
+  </aside>
+
+  <div id="help" hidden>
+    <div class="help-card">
+      <h2>Aide – Explorateur 3D</h2>
+      <p>Toutes les cotes sont en <b>millimètres</b>. Repère véhicule : <b>X</b> vers l'avant, <b>Y</b> vers le haut, <b>Z</b> vers la droite. Origine au sol, au milieu de l'empattement.</p>
+      <table>
+        <tr><td>Clic</td><td>Sélectionner une pièce</td></tr>
+        <tr><td>Clic répété</td><td>Sélectionner la pièce située derrière</td></tr>
+        <tr><td>Double-clic / F</td><td>Centrer la caméra sur la sélection</td></tr>
+        <tr><td>Maj + clic</td><td>Sélectionner l'ensemble parent</td></tr>
+        <tr><td>G / R</td><td>Déplacer / pivoter la pièce (poignées 3D)</td></tr>
+        <tr><td>I / H</td><td>Isoler / masquer la sélection</td></tr>
+        <tr><td>E</td><td>Basculer la vue éclatée</td></tr>
+        <tr><td>X / W / C / L / M</td><td>Rayons X / filaire / cotes / étiquettes / mesure</td></tr>
+        <tr><td>Échap</td><td>Désélectionner / quitter le mode</td></tr>
+      </table>
+      <p class="note">Les modèles sont des représentations génériques construites à partir de cotes typiques (normes ISO pour la visserie). Ils ne reproduisent pas les plans d'un constructeur particulier.</p>
+      <button id="help-close">Fermer</button>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
