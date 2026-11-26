@@ -28,7 +28,7 @@ const viewport = $('#viewport');
 // Téléphones et tablettes : rendu allégé (moins de pixels, pas d'anticrénelage matériel) pour éviter
 // que le navigateur ne ferme la page faute de mémoire, et pour limiter la chauffe.
 const LITE = window.matchMedia('(pointer: coarse)').matches || Math.min(screen.width, screen.height) < 820;
-const renderer = new THREE.WebGLRenderer({ antialias: !LITE, alpha: true, logarithmicDepthBuffer: true, powerPreference: LITE ? 'low-power' : 'high-performance' });
+const renderer = new THREE.WebGLRenderer({ antialias: !LITE, alpha: true, logarithmicDepthBuffer: !LITE, powerPreference: LITE ? 'low-power' : 'high-performance' });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, LITE ? 1.25 : 2));
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
@@ -54,10 +54,12 @@ viewport.appendChild(labelRenderer.domElement);
 
 const scene = new THREE.Scene();
 const pmrem = new THREE.PMREMGenerator(renderer);
-scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+// Éclairage : reflets d'environnement sur ordinateur ; sur téléphone, éclairage simple (beaucoup moins de calculs par pixel)
+if (!LITE) scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
 const sun = new THREE.DirectionalLight(0xffffff, 1.6);
 sun.position.set(0.6, 1, 0.4);
-scene.add(sun, new THREE.HemisphereLight(0xdde6ff, 0x30281e, 0.6));
+scene.add(sun, new THREE.HemisphereLight(0xdde6ff, 0x30281e, LITE ? 1.7 : 0.6));
+if (LITE) scene.add(new THREE.AmbientLight(0xffffff, 0.35));
 
 const camera = new THREE.PerspectiveCamera(40, 1, 5, 200000);
 const controls = new OrbitControls(camera, renderer.domElement);
@@ -145,6 +147,8 @@ function loadVehicle(cat, type) {
     scene.add(state.root);
     state.meshes = [];
     state.root.traverse((o) => { if (o.isMesh) state.meshes.push(o); });
+    // Téléphone : sans reflets d'environnement, les métaux paraîtraient noirs ; on les rend plus mats
+    if (LITE) for (const m of state.meshes) { m.material.metalness = Math.min(m.material.metalness, 0.25); m.material.roughness = Math.max(m.material.roughness, 0.45); }
     prepareExplode(state.root);
     applyExplode();
     setupGround();
@@ -820,6 +824,11 @@ function tick(now) {
   }
   stepCamAnim(now);
   controls.update();
+  if (LITE) {
+    // Sans tampon de profondeur logarithmique : plan proche ajusté à la distance pour éviter les scintillements
+    const near = Math.max(1, camera.position.distanceTo(controls.target) / 300);
+    if (Math.abs(near - camera.near) / camera.near > 0.15) { camera.near = near; camera.updateProjectionMatrix(); }
+  }
   processHover();
   // les points de mesure gardent une taille constante à l'écran
   for (const o of measureGroup.children) if (o.userData.screenScale) o.scale.setScalar(camera.position.distanceTo(o.position) * 0.006);
