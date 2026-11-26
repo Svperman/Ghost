@@ -1,267 +1,498 @@
-// Berline compacte 5 places – traction, moteur 4 cylindres 1,6 L transversal
-// Longueur 4 520 mm · largeur 1 780 mm · hauteur 1 440 mm · empattement 2 700 mm · voie 1 550 mm
-import { Assembly, S, SIDES, boltRow, axisRot } from '../core/builder.js';
+// Voitures – générateur paramétrique (toutes cotes en mm)
+// Repère : X avant, Y haut, Z droite. Origine au sol, au milieu de l'empattement.
+import { Assembly, S, SIDES, boltRow, boltCircle, axisRot } from '../core/builder.js';
 import { wheel, inlineEngine, seat } from '../core/parts.js';
 
-const PAINT = 0x1d5fa8;
-const WB = 2700, TRACK = 1550, WY = 316; // empattement, voie, hauteur axe de roue
+// ---------------------------------------------------------------------------- Types de voitures
+export const CAR_TYPES = {
+  citadine: {
+    label: 'Citadine', desc: 'Citadine 5 portes – traction – 3 cylindres 1,0 L turbo',
+    L: 3990, W: 1730, H: 1480, WB: 2500, fo: 780, track: 1500, tire: [185, 65, 15], clear: 150, belt: 930, nose: 760,
+    rear: 'hatch', doors: 4, rake: 32, paint: 0xd7472a, drive: 'FWD', eng: { n: 3, bore: 71.9, stroke: 82, pitch: 80, label: '1,0 L 3 cylindres turbo essence', kw: 74, turbo: true },
+    rows: 2, disc: [[266, 22], [249, 10]],
+    makers: ['Renault (Clio)', 'Peugeot (208)', 'Volkswagen (Polo)', 'Toyota (Yaris)', 'Fiat (500)', 'Citroën (C3)', 'Dacia (Sandero)', 'Hyundai (i20)'],
+  },
+  berline: {
+    label: 'Berline', desc: 'Berline compacte 4 portes – traction – 4 cylindres 1,6 L',
+    L: 4520, W: 1780, H: 1440, WB: 2700, fo: 900, track: 1550, tire: [205, 55, 16], clear: 150, belt: 950, nose: 790,
+    rear: 'tri', doors: 4, rake: 38, paint: 0x1d5fa8, drive: 'FWD', eng: { n: 4, bore: 79, stroke: 81.4, pitch: 88, label: '1,6 L 4 cylindres essence', kw: 85 },
+    rows: 2, disc: [[283, 26], [268, 12]],
+    makers: ['Peugeot (508)', 'Toyota (Corolla)', 'Volkswagen (Passat)', 'BMW (Série 3)', 'Mercedes-Benz (Classe C)', 'Audi (A4)', 'Skoda (Octavia)', 'Honda (Civic)'],
+  },
+  break: {
+    label: 'Break', desc: 'Break familial – traction – 4 cylindres 2,0 L diesel',
+    L: 4780, W: 1830, H: 1480, WB: 2790, fo: 920, track: 1580, tire: [215, 55, 17], clear: 155, belt: 960, nose: 800,
+    rear: 'wagon', doors: 4, rake: 36, paint: 0x5b6670, drive: 'FWD', eng: { n: 4, bore: 81, stroke: 95.5, pitch: 88, label: '2,0 L 4 cylindres diesel', kw: 110, diesel: true },
+    rows: 2, disc: [[312, 25], [272, 10]], roofBars: true,
+    makers: ['Volkswagen (Passat SW)', 'Skoda (Superb Combi)', 'Peugeot (308 SW)', 'Volvo (V60)', 'Audi (A6 Avant)', 'Mercedes-Benz (Classe E Break)'],
+  },
+  suv: {
+    label: 'SUV 4×4', desc: 'SUV familial – transmission intégrale – 4 cylindres 2,0 L',
+    L: 4600, W: 1870, H: 1690, WB: 2730, fo: 900, track: 1600, tire: [235, 55, 19], clear: 210, belt: 1110, nose: 960,
+    rear: 'wagon', doors: 4, rake: 34, paint: 0x2e4a3c, drive: 'AWD', eng: { n: 4, bore: 82.5, stroke: 92.8, pitch: 90, label: '2,0 L 4 cylindres turbo essence', kw: 140, turbo: true },
+    rows: 2, disc: [[340, 30], [300, 12]], roofBars: true, flares: true,
+    makers: ['Toyota (RAV4)', 'Peugeot (3008)', 'Volkswagen (Tiguan)', 'Jeep (Compass)', 'Land Rover (Discovery Sport)', 'Hyundai (Tucson)', 'Kia (Sportage)', 'BMW (X3)'],
+  },
+  monospace: {
+    label: 'Monospace 7 places', desc: 'Monospace 7 places – traction – 4 cylindres 1,5 L diesel',
+    L: 4760, W: 1850, H: 1750, WB: 2900, fo: 930, track: 1590, tire: [215, 60, 17], clear: 165, belt: 1080, nose: 900,
+    rear: 'wagon', doors: 4, rake: 28, paint: 0x8a1f2d, drive: 'FWD', eng: { n: 4, bore: 75, stroke: 84.8, pitch: 84, label: '1,5 L 4 cylindres diesel', kw: 96, diesel: true },
+    rows: 3, disc: [[304, 26], [268, 12]],
+    makers: ['Renault (Espace)', 'Citroën (C4 SpaceTourer)', 'Volkswagen (Touran)', 'Ford (S-Max)', 'Toyota (Sienna)', 'Kia (Carnival)'],
+  },
+  coupe: {
+    label: 'Coupé sportif', desc: 'Coupé 2+2 – propulsion – 6 cylindres en ligne 3,0 L biturbo',
+    L: 4450, W: 1890, H: 1300, WB: 2700, fo: 870, track: 1600, tire: [255, 35, 19], clear: 120, belt: 840, nose: 640,
+    rear: 'fast', doors: 2, rake: 26, paint: 0xe3b505, drive: 'RWD', eng: { n: 6, bore: 84, stroke: 90, pitch: 91, label: '3,0 L 6 cylindres en ligne biturbo', kw: 331, turbo: true },
+    rows: 2, disc: [[380, 34], [370, 28]],
+    makers: ['BMW (M4)', 'Ford (Mustang)', 'Chevrolet (Camaro)', 'Nissan (Z)', 'Toyota (GR Supra)', 'Porsche (911 – moteur arrière)', 'Alpine (A110 – moteur central)'],
+  },
+  pickup: {
+    label: 'Pick-up double cabine', desc: 'Pick-up double cabine sur châssis échelle – 4×4 – 4 cylindres 2,8 L diesel',
+    L: 5330, W: 1855, H: 1815, WB: 3085, fo: 930, track: 1550, tire: [265, 65, 17], clear: 235, belt: 1250, nose: 1080,
+    rear: 'pickup', doors: 4, rake: 32, paint: 0xb8babd, drive: 'AWD', frame: true, leaf: true, flares: true,
+    eng: { n: 4, bore: 92, stroke: 103.6, pitch: 98, label: '2,8 L 4 cylindres turbo diesel', kw: 150, diesel: true, turbo: true },
+    rows: 2, disc: [[319, 28], [295, 50]], drumRear: true,
+    makers: ['Toyota (Hilux)', 'Ford (Ranger / F-150)', 'Mitsubishi (L200)', 'Nissan (Navara)', 'Isuzu (D-Max)', 'Volkswagen (Amarok)', 'RAM (1500)'],
+  },
+  electrique: {
+    label: 'Électrique', desc: 'Berline électrique – propulsion – moteur synchrone 210 kW – batterie 75 kWh',
+    L: 4690, W: 1850, H: 1440, WB: 2875, fo: 850, track: 1580, tire: [235, 45, 18], clear: 140, belt: 960, nose: 720,
+    rear: 'fast', doors: 4, rake: 26, paint: 0xf0f0ee, drive: 'EV', eng: null,
+    rows: 2, disc: [[320, 28], [335, 20]],
+    makers: ['Tesla (Model 3)', 'Renault (Mégane E-Tech)', 'Volkswagen (ID.3)', 'Hyundai (Ioniq 6)', 'BYD (Seal)', 'Kia (EV6)', 'Peugeot (e-308)', 'Polestar (2)'],
+  },
+};
 
-export function buildCar() {
-  const car = new Assembly('Berline compacte', { prefix: 'VT', code: 'GEN', desc: 'Berline 5 portes – 4 520 × 1 780 × 1 440 mm – masse à vide ≈ 1 250 kg' });
+// ---------------------------------------------------------------------------- Générateur
+export function buildCar(type = 'berline') {
+  const P = CAR_TYPES[type] || CAR_TYPES.berline;
+  const { L, W, H, WB, track, belt, nose, paint } = P;
   const XF = WB / 2, XR = -WB / 2;
+  const xF = XF + P.fo, xR = -(L - WB - P.fo) - WB / 2;
+  const D = Math.round(P.tire[2] * 25.4 + 2 * P.tire[0] * P.tire[1] / 100);
+  const WY = D / 2, AR = D / 2 + 55;
+  const clr = P.clear, floorY = clr + 130;
+  const halfW = W / 2, cabW = W - 380;
+  const tail = belt - 20;
+  const longi = P.eng && (P.drive === 'RWD' || P.frame);
+  // Silhouette de l'habitacle
+  const wsX = XF - 230 + (P.rake < 30 ? 100 : 0) - (longi ? 450 : 0); // pied de pare-brise
+  const run = (H - belt) / Math.tan(P.rake * Math.PI / 180);
+  const roofF = wsX - run;
+  const bX = P.doors === 2 ? wsX - 1250 : wsX - 1080; // montant B
+  const hoodAt = (x) => belt + (nose - belt) * Math.min(1, Math.max(0, (x - wsX) / (xF - 90 - wsX)));
+  let cR, roofR;
+  if (P.rear === 'tri') { cR = xR + 820; roofR = cR + 520; }
+  else if (P.rear === 'hatch') { cR = xR + 70; roofR = xR + 380; }
+  else if (P.rear === 'wagon') { cR = xR + 40; roofR = xR + 170; }
+  else if (P.rear === 'fast') { cR = xR + 380; roofR = Math.min(roofF - 500, XR + 900); }
+  else { cR = bX - 1080; roofR = cR + 40; } // pick-up : cabine double
+
+  const car = new Assembly(`${P.label}`, { prefix: 'VT', code: 'GEN', layer: 'meca', desc: `${P.desc} – ${L} × ${W} × ${H} mm – empattement ${WB} mm` });
 
   // ------------------------------------------------------------------ Carrosserie
-  const body = car.group('Carrosserie', { code: 'CAR' });
+  const body = car.group('Carrosserie', { code: 'CAR', layer: 'ext' });
   const arch = (cx, from, to) => {
     const pts = [];
-    for (let i = 0; i <= 20; i++) {
-      const a = from + (to - from) * (i / 20);
-      pts.push([cx + 375 * Math.cos(a), WY + 375 * Math.sin(a)]);
-    }
+    for (let i = 0; i <= 20; i++) { const a = from + (to - from) * (i / 20); pts.push([cx + AR * Math.cos(a), WY + AR * Math.sin(a)]); }
     return pts;
   };
+  const bedY = WY + AR + 20; // plancher de benne (pick-up), au-dessus des passages de roue
+  const top = P.rear === 'pickup' ? [[xR + 10, bedY], [cR - 50, bedY], [cR - 50, belt]] : [[xR + 30, tail + 10], [cR, belt]];
   const caisse = [
-    [-2230, 300], [-2262, 520], [-2240, 930], [-1450, 960], [950, 950], [2180, 790], [2262, 560], [2240, 330], [XF + 375, 180],
-    ...arch(XF, 0, Math.PI), [XR + 375, 180], ...arch(XR, 0, Math.PI), [-2000, 180],
+    [xR + 30, clr + 120], [xR - 10, clr + 330], ...(P.rear === 'pickup' ? [] : [[xR + 10, tail]]), ...top, [wsX, belt],
+    [xF - 80, nose], [xF + 10, nose - 220], [xF - 10, clr + 150], [XF + AR, clr + 20],
+    ...arch(XF, 0, Math.PI), [XR + AR, clr + 20], ...arch(XR, 0, Math.PI), [xR + 250, clr + 20],
   ];
-  body.part('Caisse en blanc (structure)', S.extrude(caisse, 1780, 40), { mat: 'peinture', color: PAINT, desc: 'Structure monocoque acier THLE soudée par points' });
-  body.part('Pavillon / habitacle', S.extrude([[-1450, 950], [-900, 1420], [350, 1440], [950, 955]], 1400, 60), { mat: 'peinture', color: PAINT });
-  body.part('Capot moteur', S.box(1240, 10, 1600), { pos: [1565, 878, 0], rot: [0, 0, -7.41], mat: 'peinture', color: PAINT });
-  body.part('Hayon / couvercle de coffre', S.box(790, 10, 1580), { pos: [-1845, 952, 0], rot: [0, 0, 2.2], mat: 'peinture', color: PAINT });
-  body.part('Bouclier avant', S.box(130, 300, 1790), { pos: [2235, 440, 0], mat: 'abs', color: PAINT });
-  body.part('Bouclier arrière', S.box(130, 300, 1790), { pos: [-2235, 440, 0], mat: 'abs', color: PAINT });
-  body.part('Calandre', S.box(30, 170, 720), { pos: [2268, 640, 0], mat: 'abs', color: 0x111111 });
-  body.part('Logo de calandre', S.cyl(90, 8, 'x'), { pos: [2285, 650, 0], mat: 'chrome' });
-  body.part('Grille de bouclier inférieure', S.box(20, 110, 900), { pos: [2305, 380, 0], mat: 'abs', color: 0x111111 });
-  body.part('Plaque d\'immatriculation avant', S.box(4, 110, 520), { pos: [2303, 480, 0], mat: 'aluminium', color: 0xffffff });
-  body.part('Plaque d\'immatriculation arrière', S.box(4, 110, 520), { pos: [-2303, 560, 0], mat: 'aluminium', color: 0xffffff });
-  body.part('Becquet de pavillon', S.box(200, 20, 1200), { pos: [-950, 1420, 0], rot: [0, 0, 8], mat: 'abs', color: PAINT });
-  body.part('Antenne de toit', S.box(140, 60, 40), { pos: [-600, 1460, 0], mat: 'abs', color: 0x111111 });
+  body.part('Caisse en blanc (structure)', S.extrude(caisse, W, 40), { mat: 'peinture', color: paint, desc: P.frame ? 'Carrosserie sur châssis séparé (body-on-frame)' : 'Structure monocoque acier THLE soudée par points' });
+  body.part('Pavillon / habitacle', S.extrude([[cR, belt - 5], [roofR, H], [roofF, H], [wsX, belt - 5]], cabW, 60), { mat: 'peinture', color: paint });
+  panel(body, 'Capot moteur', [wsX + 10, belt - 2], [xF - 90, nose - 2], W - 180, 10, { mat: 'peinture', color: paint });
+  if (P.rear === 'tri') panel(body, 'Couvercle de coffre', [xR + 20, tail + 12], [cR, belt + 2], W - 200, 10, { mat: 'peinture', color: paint });
+  if (P.rear === 'fast') panel(body, 'Hayon / custode arrière', [xR + 30, tail + 12], [cR, belt + 2], W - 200, 10, { mat: 'peinture', color: paint });
+  if (P.rear === 'hatch' || P.rear === 'wagon') body.part('Hayon', S.box(20, belt - clr - 300, W - 260), { pos: [xR - 12, (belt + clr + 300) / 2, 0], mat: 'peinture', color: paint });
+  body.part('Bouclier avant', S.box(130, 300, W + 10), { pos: [xF - 15, clr + 280, 0], mat: 'abs', color: paint });
+  body.part('Bouclier arrière', S.box(130, 300, W + 10), { pos: [xR + 15, clr + 280, 0], mat: 'abs', color: paint });
+  body.part('Calandre', S.box(30, Math.max(100, Math.min(200, nose - clr - 350)), W * 0.42), { pos: [xF + 5, nose - 150, 0], mat: 'abs', color: 0x111111 });
+  body.part('Emblème de calandre', S.cyl(90, 8, 'x'), { pos: [xF + 22, nose - 140, 0], mat: 'chrome', desc: 'Emplacement du logo constructeur' });
+  body.part('Grille de bouclier inférieure', S.box(20, 110, W * 0.5), { pos: [xF + 50, clr + 230, 0], mat: 'abs', color: 0x111111 });
+  body.part('Plaque d\'immatriculation avant', S.box(4, 110, 520), { pos: [xF + 55, clr + 330, 0], mat: 'aluminium', color: 0xffffff });
+  body.part('Plaque d\'immatriculation arrière', S.box(4, 110, 520), { pos: [xR - 50, clr + 420, 0], mat: 'aluminium', color: 0xffffff });
+  body.part('Antenne de toit', S.box(140, 60, 40), { pos: [roofR + 200, H + 25, 0], mat: 'abs', color: 0x111111 });
+  if (P.roofBars) for (const sd of SIDES) body.part(`Barre de toit ${sd.f}`, S.box(roofF - roofR - 200, 40, 30), { pos: [(roofF + roofR) / 2, H + 30, sd.s * (cabW / 2 - 60)], mat: 'aluminium' });
+  if (P.drive === 'RWD') body.part('Aileron arrière', S.box(220, 20, W - 400), { pos: [xR + 160, tail + 60, 0], rot: [0, 0, 6], mat: 'carbone' });
+
+  if (P.rear === 'pickup') {
+    const bn = body.group('Benne de chargement', { code: 'BEN' });
+    const bL = cR - xR - 60, bx = (cR + xR) / 2 - 10, by = bedY;
+    bn.part('Plancher de benne', S.box(bL, 10, W - 140), { pos: [bx, by, 0], mat: 'peinture', color: paint });
+    for (const sd of SIDES) bn.part(`Ridelle ${sd.f}`, S.box(bL, tail - by, 12), { pos: [bx, (tail + by) / 2, sd.s * (halfW - 70)], mat: 'peinture', color: paint });
+    bn.part('Ridelle avant', S.box(12, tail - by, W - 140), { pos: [cR - 40, (tail + by) / 2, 0], mat: 'peinture', color: paint });
+    bn.part('Hayon de benne', S.box(14, tail - by + 100, W - 140), { pos: [xR + 10, (tail + by - 100) / 2, 0], mat: 'peinture', color: paint });
+    bn.part('Revêtement de benne', S.box(bL - 40, 6, W - 180), { pos: [bx, by + 8, 0], mat: 'plastique' });
+    for (const sd of SIDES) for (const k of [1, 2]) bn.part(`Anneau d'arrimage ${sd.c}${k}`, S.torus(40, 8, 'z'), { pos: [bx + (k === 1 ? -bL / 3 : bL / 3), by + 40, sd.s * (halfW - 90)], mat: 'inox' });
+    for (const sd of SIDES) boltRow(bn, { from: [bx - bL / 2 + 80, by - 15, sd.s * 450], to: [bx + bL / 2 - 80, by - 15, sd.s * 450], n: 6, d: 10, L: 40, axis: 'y', dir: -1, label: `Vis de fixation de benne ${sd.c}`, couple: 60 });
+  }
 
   const vit = body.group('Vitrage', { code: 'VIT' });
-  vit.part('Pare-brise', S.box(768, 6, 1320), { pos: [654, 1205, 0], rot: [0, 0, -38.66], mat: 'verre' });
-  vit.part('Lunette arrière', S.box(723, 6, 1300), { pos: [-1180, 1190, 0], rot: [0, 0, 40.5], mat: 'verre' });
+  panel(vit, 'Pare-brise', [wsX - 4, belt + 4], [roofF - 4, H - 4], cabW - 60, 6, { mat: 'verre', desc: 'Verre feuilleté 4,76 mm' });
+  if (P.rear === 'pickup') vit.part('Lunette arrière', S.box(6, (H - belt) * 0.6, cabW - 300), { pos: [cR + 4, belt + (H - belt) * 0.45, 0], mat: 'verre' });
+  else panel(vit, 'Lunette arrière', [cR + 6, belt + 6], [roofR + 6, H - 6], cabW - 120, 6, { mat: 'verre' });
   for (const sd of SIDES) {
-    const z = sd.s * 703;
-    vit.part(`Vitre de porte avant ${sd.f}`, S.extrude([[-230, 990], [-230, 1405], [330, 1410], [900, 990]], 5), { pos: [0, 0, z], mat: 'verre' });
-    vit.part(`Vitre de porte arrière ${sd.f}`, S.extrude([[-1360, 990], [-900, 1390], [-290, 1400], [-290, 990]], 5), { pos: [0, 0, z], mat: 'verre' });
-    vit.part(`Montant B ${sd.m}`, S.box(60, 420, 8), { pos: [-260, 1195, z], mat: 'abs', color: 0x111111 });
+    const z = sd.s * (cabW / 2 + 3);
+    const yb = belt + 40, yt = H - 40;
+    vit.part(`Vitre avant ${sd.f}`, S.extrude([[bX + 20, yb], [bX + 20, yt], [roofF - 40, yt], [wsX - 80, yb]], 5), { pos: [0, 0, z], mat: 'verre' });
+    const rx0 = P.rear === 'pickup' ? cR + 40 : Math.max(cR, roofR) + 60;
+    if (bX - 40 - rx0 > 150) vit.part(`Vitre arrière ${sd.f}`, S.extrude([[rx0, yb], [Math.max(roofR + 60, rx0), yt], [bX - 40, yt], [bX - 40, yb]], 5), { pos: [0, 0, z], mat: 'verre' });
+    vit.part(`Montant B ${sd.m}`, S.box(60, H - belt - 40, 8), { pos: [bX - 10, (H + belt) / 2, z], mat: 'abs', color: 0x111111 });
   }
   const ess = vit.group('Essuie-glaces', { code: 'VIT' });
+  const ang = -Math.atan2(H - belt, wsX - roofF) * 180 / Math.PI;
   for (const sd of SIDES) {
-    ess.part(`Bras d'essuie-glace ${sd.m}`, S.box(14, 10, 480), { pos: [935, 1000, sd.s * 300 - 60], rot: [0, 0, -38.66], mat: 'plastique' });
-    ess.part(`Balai d'essuie-glace ${sd.m}`, S.box(18, 14, 560), { pos: [915, 1022, sd.s * 300 - 60], rot: [0, 0, -38.66], mat: 'caoutchouc' });
-    ess.part(`Écrou d'axe d'essuie-glace ${sd.m}`, S.nut(10), { pos: [985, 958, sd.s * 300 - 300], mat: 'zingue', couple: 20 });
+    ess.part(`Bras d'essuie-glace ${sd.m}`, S.box(14, 10, cabW * 0.34), { pos: [wsX - 40, belt + 45, sd.s * cabW * 0.2 - 60], rot: [0, 0, ang], mat: 'plastique' });
+    ess.part(`Balai d'essuie-glace ${sd.m}`, S.box(18, 14, cabW * 0.4), { pos: [wsX - 60, belt + 65, sd.s * cabW * 0.2 - 60], rot: [0, 0, ang], mat: 'caoutchouc' });
+    ess.part(`Écrou d'axe d'essuie-glace ${sd.m}`, S.nut(10), { pos: [wsX + 30, belt + 8, sd.s * cabW * 0.2 - cabW * 0.17 - 60], mat: 'zingue', couple: 20 });
   }
 
   for (const sd of SIDES) {
-    const z = sd.s * 894;
-    for (const [nom, x0, x1] of [['avant', -250, 975], ['arrière', -1000, -255]]) {
-      const pg = body.group(`Portière ${nom} ${sd.f}`, { code: 'POR' });
-      pg.part('Panneau de porte', S.extrude([[x0, 330], [x0, 955], [x1, 955], [x1, 330]], 8, 2), { pos: [0, 0, z], mat: 'peinture', color: PAINT });
-      pg.part('Garniture intérieure', S.box(x1 - x0 - 60, 520, 30), { pos: [(x0 + x1) / 2, 650, sd.s * 850], mat: 'abs' });
-      pg.part('Poignée extérieure', S.box(160, 30, 25), { pos: [x0 + 120, 860, sd.s * 910], mat: 'chrome' });
-      pg.part('Serrure de porte', S.box(60, 90, 50), { pos: [x0 + 30, 800, sd.s * 860], mat: 'zingue' });
-      pg.part('Lève-vitre électrique', S.box(400, 300, 20), { pos: [(x0 + x1) / 2, 650, sd.s * 870], mat: 'zingue' });
-      for (const [k, y] of [['supérieure', 820], ['inférieure', 480]]) {
-        pg.part(`Charnière ${k}`, S.box(60, 80, 30), { pos: [x1 - 20, y, sd.s * 880], mat: 'acier' });
-        pg.part(`Vis de charnière ${k} 1`, S.bolt(8, 25, 'z'), { pos: [x1 - 30, y + 20, sd.s * 900], rot: axisRot('z', sd.s), mat: 'acierHR', couple: 25 });
-        pg.part(`Vis de charnière ${k} 2`, S.bolt(8, 25, 'z'), { pos: [x1 - 30, y - 20, sd.s * 900], rot: axisRot('z', sd.s), mat: 'acierHR', couple: 25 });
-      }
-      if (nom === 'avant') {
-        const rv = pg.group(`Rétroviseur extérieur ${sd.m}`, { code: 'POR' });
-        rv.part('Coque de rétroviseur', S.ellipsoid(150, 115, 230), { pos: [880, 1010, sd.s * 1010], mat: 'peinture', color: PAINT });
-        rv.part('Miroir', S.box(6, 95, 190), { pos: [805, 1010, sd.s * 1015], mat: 'chrome' });
-        rv.part('Répétiteur de clignotant', S.box(20, 15, 120), { pos: [900, 965, sd.s * 1030], mat: 'feuOrange' });
-        rv.part('Pied de rétroviseur', S.box(90, 70, 110), { pos: [860, 990, sd.s * 925], mat: 'abs' });
+    const z = sd.s * (halfW + 4);
+    const doorsList = P.doors === 2 ? [['', bX, wsX + 20]] : [['avant ', bX, wsX + 20], ['arrière ', Math.max(XR + AR + 30, bX - 950), bX - 5]];
+    for (const [nom, x0, x1] of doorsList) {
+      const pg = body.group(`Portière ${nom}${sd.f}`, { code: 'POR' });
+      pg.part('Panneau de porte', S.extrude([[x0, clr + 150], [x0, belt + 5], [x1, belt + 5], [x1, clr + 150]], 8, 2), { pos: [0, 0, z], mat: 'peinture', color: paint });
+      pg.part('Garniture intérieure', S.box(x1 - x0 - 60, (belt - clr) * 0.6, 30), { pos: [(x0 + x1) / 2, (belt + clr) / 2 + 60, sd.s * (halfW - 40)], mat: 'abs', layer: 'int' });
+      pg.part('Poignée extérieure', S.box(160, 30, 25), { pos: [x0 + 120, belt - 90, sd.s * (halfW + 20)], mat: 'chrome' });
+      pg.part('Serrure de porte', S.box(60, 90, 50), { pos: [x0 + 30, belt - 150, sd.s * (halfW - 30)], mat: 'zingue' });
+      pg.part('Lève-vitre électrique', S.box(400, 300, 20), { pos: [(x0 + x1) / 2, (belt + clr) / 2 + 60, sd.s * (halfW - 20)], mat: 'zingue' });
+      for (const [k, y] of [['supérieure', belt - 130], ['inférieure', clr + 300]]) {
+        pg.part(`Charnière ${k}`, S.box(60, 80, 30), { pos: [x1 - 20, y, sd.s * (halfW - 10)], mat: 'acier' });
+        for (const dy of [20, -20]) pg.part(`Vis de charnière ${k} ${dy > 0 ? 1 : 2}`, S.bolt(8, 25, 'z'), { pos: [x1 - 30, y + dy, sd.s * (halfW + 10)], rot: axisRot('z', sd.s), mat: 'acierHR', couple: 25 });
       }
     }
-    body.part(`Bas de caisse ${sd.m}`, S.box(1960, 90, 40), { pos: [-15, 225, sd.s * 880], mat: 'abs', color: 0x111111 });
+    const rv = body.group(`Rétroviseur extérieur ${sd.m}`, { code: 'POR' });
+    rv.part('Coque de rétroviseur', S.ellipsoid(150, 115, 230), { pos: [wsX - 70, belt + 60, sd.s * (halfW + 120)], mat: 'peinture', color: paint });
+    rv.part('Miroir', S.box(6, 95, 190), { pos: [wsX - 145, belt + 60, sd.s * (halfW + 125)], mat: 'chrome' });
+    rv.part('Répétiteur de clignotant', S.box(20, 15, 120), { pos: [wsX - 50, belt + 15, sd.s * (halfW + 140)], mat: 'feuOrange' });
+    rv.part('Pied de rétroviseur', S.box(90, 70, 110), { pos: [wsX - 90, belt + 40, sd.s * (halfW + 30)], mat: 'abs' });
+    body.part(`Bas de caisse ${sd.m}`, S.box(WB - 2 * AR - 40, 90, 40), { pos: [0, clr + 45, sd.s * (halfW - 10)], mat: 'abs', color: 0x111111 });
+    if (P.flares) for (const [ax, n] of [[XF, 'avant'], [XR, 'arrière']]) body.part(`Élargisseur d'aile ${n} ${sd.m}`, S.tube(AR * 2 + 50, AR * 2, 60, 'z', 40), { pos: [ax, WY, sd.s * (halfW - 10)], scale: [1, 1, 1], mat: 'abs', color: 0x111111 });
   }
 
   const ecl = body.group('Éclairage & signalisation', { code: 'ECL' });
   for (const sd of SIDES) {
-    ecl.part(`Projecteur avant ${sd.m}`, S.ellipsoid(180, 130, 380), { pos: [2190, 720, sd.s * 610], rot: [0, 0, -15], mat: 'feuBlanc' });
-    ecl.part(`Ampoule H7 ${sd.f}`, S.cyl(12, 50, 'x'), { pos: [2120, 720, sd.s * 610], mat: 'verre' });
-    ecl.part(`Antibrouillard ${sd.m}`, S.cyl(80, 40, 'x'), { pos: [2290, 330, sd.s * 700], mat: 'feuBlanc' });
-    ecl.part(`Feu arrière ${sd.m}`, S.box(80, 140, 330), { pos: [-2220, 840, sd.s * 690], mat: 'feuRouge' });
-    ecl.part(`Clignotant arrière ${sd.m}`, S.box(80, 40, 150), { pos: [-2215, 750, sd.s * 750], mat: 'feuOrange' });
-    ecl.part(`Catadioptre ${sd.m}`, S.box(10, 30, 120), { pos: [-2305, 380, sd.s * 700], mat: 'feuRouge' });
+    ecl.part(`Projecteur avant ${sd.m}`, S.ellipsoid(180, 120, 360), { pos: [xF - 50, nose - 70, sd.s * (halfW - 260)], rot: [0, 0, -15], mat: 'feuBlanc' });
+    ecl.part(`Module LED / ampoule ${sd.f}`, S.cyl(12, 50, 'x'), { pos: [xF - 120, nose - 70, sd.s * (halfW - 260)], mat: 'verre' });
+    ecl.part(`Antibrouillard ${sd.m}`, S.cyl(80, 40, 'x'), { pos: [xF + 50, clr + 160, sd.s * (halfW - 180)], mat: 'feuBlanc' });
+    ecl.part(`Feu arrière ${sd.m}`, S.box(80, 140, 330), { pos: [xR, tail - 90, sd.s * (halfW - 200)], mat: 'feuRouge' });
+    ecl.part(`Clignotant arrière ${sd.m}`, S.box(80, 40, 150), { pos: [xR + 5, tail - 190, sd.s * (halfW - 140)], mat: 'feuOrange' });
+    ecl.part(`Catadioptre ${sd.m}`, S.box(10, 30, 120), { pos: [xR - 55, clr + 200, sd.s * (halfW - 190)], mat: 'feuRouge' });
   }
-  ecl.part('Troisième feu stop', S.box(30, 30, 400), { pos: [-1440, 1340, 0], rot: [0, 0, 40], mat: 'feuRouge' });
+  ecl.part('Troisième feu stop', S.box(30, 30, 400), { pos: [roofR + 20, H - 30, 0], mat: 'feuRouge' });
 
-  // ------------------------------------------------------------------ Plateforme / châssis
-  const ch = car.group('Plateforme & soubassement', { code: 'CHS' });
+  // ------------------------------------------------------------------ Châssis / plateforme
+  const ch = car.group(P.frame ? 'Châssis échelle' : 'Plateforme & soubassement', { code: 'CHS', layer: 'struct' });
+  const lw = P.frame ? 900 : W - 660;
+  const ly = clr + (P.frame ? 200 : 110);
   for (const sd of SIDES) {
-    ch.part(`Longeron ${sd.m}`, S.box(4200, 120, 80), { pos: [0, 260, sd.s * 560], mat: 'acier' });
-    boltRow(ch, { from: [-1800, 200, sd.s * 560], to: [1800, 200, sd.s * 560], n: 8, d: 10, L: 30, axis: 'y', dir: -1, label: `Vis de fixation longeron ${sd.c}`, couple: 60 });
+    ch.part(`Longeron ${sd.m}`, S.box(L - 400, P.frame ? 180 : 120, P.frame ? 70 : 80), { pos: [(xF + xR) / 2, ly, sd.s * lw / 2], mat: P.frame ? 'peinture' : 'acier', color: P.frame ? 0x1c1d20 : undefined, desc: P.frame ? 'Profil caisson acier 180 × 70 × 4 mm' : '' });
+    boltRow(ch, { from: [xR + 400, ly - (P.frame ? 95 : 65), sd.s * lw / 2], to: [xF - 400, ly - (P.frame ? 95 : 65), sd.s * lw / 2], n: P.frame ? 8 : 6, d: P.frame ? 12 : 10, L: 30, axis: 'y', dir: -1, label: P.frame ? `Boulon de traverse ${sd.c}` : `Vis de fixation longeron ${sd.c}`, couple: P.frame ? 90 : 60 });
+    if (P.frame) for (let k = 0; k < 4; k++) {
+      const x = wsX - 200 - k * ((wsX - xR - 400) / 3);
+      ch.part(`Silent-bloc de caisse ${sd.c}${k + 1}`, S.cyl(70, 50, 'y'), { pos: [x, ly + 115, sd.s * (lw / 2 + 60)], mat: 'caoutchouc' });
+      ch.part(`Boulon de caisse sur châssis ${sd.c}${k + 1}`, S.bolt(12, 110, 'y'), { pos: [x, ly + 150, sd.s * (lw / 2 + 60)], mat: 'acierHR', couple: 95 });
+    }
   }
-  for (const [nom, x] of [['avant', 1900], ['centrale avant', 600], ['centrale', -300], ['arrière', -1900]]) ch.part(`Traverse ${nom}`, S.box(90, 90, 1040), { pos: [x, 260, 0], mat: 'acier' });
-  ch.part('Plancher', S.box(3200, 4, 1600), { pos: [-200, 300, 0], mat: 'acier' });
-  ch.part('Tunnel central', S.box(2200, 180, 240), { pos: [0, 360, 0], mat: 'acier' });
-  ch.part('Tablier / cloison pare-feu', S.box(20, 520, 1500), { pos: [950, 640, 0], mat: 'acier' });
-  ch.part('Berceau moteur', S.box(700, 60, 1100), { pos: [1500, 260, 0], mat: 'acier' });
-  for (const [x, z] of [[1200, -500], [1200, 500], [1800, -500], [1800, 500]]) ch.part(`Vis de berceau ${x > 1500 ? 'AV' : 'AR'}${z < 0 ? 'G' : 'D'}`, S.bolt(14, 90, 'y'), { pos: [x, 230, z], rot: [180, 0, 0], mat: 'acierHR', couple: 180 });
+  const trs = [['avant', xF - 300], ['de train avant', XF - 250], ['centrale', 0], ['de train arrière', XR + 300], ['arrière', xR + 250]];
+  for (const [n, x] of trs) ch.part(`Traverse ${n}`, S.box(90, 90, lw - 80), { pos: [x, ly, 0], mat: 'acier' });
+  if (!P.frame) {
+    ch.part('Plancher', S.box(WB - 200, 4, W - 300), { pos: [-100, floorY - 30, 0], mat: 'acier' });
+    ch.part('Tunnel central', S.box(WB - 400, 180, 240), { pos: [0, floorY + 30, 0], mat: 'acier' });
+  } else ch.part('Plancher de cabine', S.box(wsX - cR, 4, W - 300), { pos: [(wsX + cR) / 2, floorY - 30, 0], mat: 'acier' });
+  ch.part('Tablier / cloison pare-feu', S.box(20, belt - floorY, W - 280), { pos: [wsX - 20, (belt + floorY) / 2, 0], mat: 'acier' });
+  ch.part('Berceau moteur', S.box(700, 60, Math.max(600, W - 680)), { pos: [XF + 150, clr + 80, 0], mat: 'acier' });
+  for (const [x, z] of [[XF - 150, -1], [XF - 150, 1], [XF + 450, -1], [XF + 450, 1]]) ch.part(`Vis de berceau ${x > XF ? 'AV' : 'AR'}${z < 0 ? 'G' : 'D'}`, S.bolt(14, 90, 'y'), { pos: [x, clr + 50, z * Math.max(500, W - 780) / 2], rot: [180, 0, 0], mat: 'acierHR', couple: 180 });
+  if (P.frame) {
+    ch.part('Attelage de remorque', S.box(300, 80, 80), { pos: [xR - 120, clr + 240, 0], mat: 'acier', color: 0x1c1d20 });
+    ch.part('Boule d\'attelage Ø50', S.sphere(50), { pos: [xR - 250, clr + 330, 0], mat: 'chrome' });
+    ch.part('Plaque de protection sous moteur', S.box(900, 6, 800), { pos: [XF + 200, clr + 30, 0], mat: 'acier' });
+  }
 
   // ------------------------------------------------------------------ Groupe motopropulseur
-  const gmp = car.group('Groupe motopropulseur', { code: 'GMP' });
-  inlineEngine(gmp, 'Moteur 1,6 L 4 cylindres essence', {
-    n: 4, bore: 79, stroke: 81.4, pitch: 88, pos: [1550, 600, 0], rot: [0, 90, 0], code: 'MOT', valves: 2, turbo: true,
-    desc: '1 598 cm³ – 16 soupapes – 85 kW', headTorque: '30 N·m + 90° + 90°',
-  });
-  const bv = gmp.group('Boîte de vitesses manuelle 6 rapports', { code: 'BV' });
-  bv.part('Carter d\'embrayage', S.cyl(300, 120, 'z', 40), { pos: [1520, 520, -330], mat: 'aluminium' });
-  bv.part('Carter de boîte', S.box(340, 330, 300), { pos: [1520, 500, -540], mat: 'aluminium' });
-  bv.part('Disque d\'embrayage', S.tube(228, 60, 10, 'z'), { pos: [1520, 520, -290], mat: 'feutre' });
-  bv.part('Mécanisme d\'embrayage', S.cyl(240, 40, 'z'), { pos: [1520, 520, -315], mat: 'acier' });
-  bv.part('Butée d\'embrayage', S.tube(70, 35, 30, 'z'), { pos: [1520, 520, -350], mat: 'acier' });
-  bv.part('Arbre primaire', S.cyl(30, 380, 'z'), { pos: [1520, 520, -520], mat: 'acierHR' });
-  bv.part('Arbre secondaire', S.cyl(35, 360, 'z'), { pos: [1520, 420, -520], mat: 'acierHR' });
-  bv.part('Différentiel – couronne', S.cyl(200, 30, 'z'), { pos: [1440, 400, -480], mat: 'acierHR' });
-  bv.part('Bouchon de remplissage BV', S.bolt(16, 14, 'x'), { pos: [1700, 450, -540], mat: 'acier', couple: 35 });
-  for (let i = 0; i < 10; i++) {
-    const a = (i / 10) * Math.PI * 2;
-    bv.part(`Vis de cloche ${String(i + 1).padStart(2, '0')}`, S.bolt(10, 45, 'z'), { pos: [1520 + Math.cos(a) * 160, 520 + Math.sin(a) * 160, -270], rot: axisRot('z', 1), mat: 'acierHR', couple: 48 });
+  const gmp = car.group(P.drive === 'EV' ? 'Chaîne de traction électrique' : 'Groupe motopropulseur', { code: 'GMP', layer: 'meca' });
+  if (P.eng) {
+    const E = P.eng;
+    const engL = E.n * E.pitch + 60;
+    const transverse = !longi;
+    const ex = transverse ? XF + 190 : XF - engL / 2 + 230;
+    const topRel = 2.5 * E.stroke + 120;
+    const ey = Math.min(WY + 290 + (clr - 150), hoodAt(transverse ? ex + 150 : ex + engL / 2) - topRel - 25);
+    inlineEngine(gmp, `Moteur ${E.label}`, {
+      n: E.n, bore: E.bore, stroke: E.stroke, pitch: E.pitch, pos: [ex, ey, 0], rot: transverse ? [0, 90, 0] : [0, 180, 0], code: 'MOT', valves: 2,
+      turbo: !!E.turbo, diesel: !!E.diesel, desc: `${Math.round(E.n * Math.PI * (E.bore / 20) ** 2 * E.stroke / 10)} cm³ – ${E.kw} kW`,
+    });
+    const bv = gmp.group(`Boîte de vitesses ${P.drive === 'FWD' ? 'manuelle 6 rapports' : 'automatique 8 rapports'}`, { code: 'BV' });
+    if (transverse) {
+      const bz = -(engL / 2 + 60);
+      bv.part('Carter d\'embrayage', S.cyl(300, 120, 'z', 40), { pos: [ex - 30, ey - 80, bz], mat: 'aluminium' });
+      bv.part('Carter de boîte', S.box(340, 330, 300), { pos: [ex - 30, ey - 100, bz - 210], mat: 'aluminium' });
+      bv.part('Disque d\'embrayage', S.tube(228, 60, 10, 'z'), { pos: [ex - 30, ey - 80, bz + 40], mat: 'feutre' });
+      bv.part('Mécanisme d\'embrayage', S.cyl(240, 40, 'z'), { pos: [ex - 30, ey - 80, bz + 15], mat: 'acier' });
+      bv.part('Arbre primaire', S.cyl(30, 380, 'z'), { pos: [ex - 30, ey - 80, bz - 190], mat: 'acierHR' });
+      bv.part('Différentiel avant – couronne', S.cyl(200, 30, 'z'), { pos: [XF, WY + 60, bz - 150], mat: 'acierHR' });
+      for (let i = 0; i < 10; i++) { const a = (i / 10) * Math.PI * 2; bv.part(`Vis de cloche ${String(i + 1).padStart(2, '0')}`, S.bolt(10, 45, 'z'), { pos: [ex - 30 + Math.cos(a) * 160, ey - 80 + Math.sin(a) * 160, bz + 60], rot: axisRot('z', 1), mat: 'acierHR', couple: 48 }); }
+      const tr = gmp.group('Transmissions avant', { code: 'TRA' });
+      for (const sd of SIDES) {
+        const zIn = sd.s < 0 ? bz - 150 : -80;
+        tr.part(`Arbre de transmission ${sd.m}`, S.rod([XF, WY + 60, zIn], [XF, WY, sd.s * (track / 2 - 110)], 30), { mat: 'acierHR' });
+        tr.part(`Joint homocinétique côté roue ${sd.m}`, S.cyl(95, 90, 'z'), { pos: [XF, WY, sd.s * (track / 2 - 130)], mat: 'caoutchouc' });
+        tr.part(`Écrou de moyeu ${sd.m}`, S.nut(22, 'z'), { pos: [XF, WY, sd.s * (track / 2 - 70)], mat: 'acierHR', couple: '280 N·m' });
+      }
+      if (P.drive === 'AWD') {
+        const ax = gmp.group('Transmission intégrale', { code: 'TRA' });
+        ax.part('Renvoi d\'angle (PTU)', S.box(220, 200, 200), { pos: [XF - 120, WY + 60, bz - 120], mat: 'aluminium' });
+        ax.part('Arbre de transmission longitudinal', S.rod([XF - 230, WY + 60, -100], [XR + 180, WY + 40, 0], 70, 60), { mat: 'acierHR' });
+        ax.part('Coupleur multidisque arrière', S.cyl(180, 120, 'x'), { pos: [XR + 200, WY + 40, 0], mat: 'aluminium' });
+        rearDiff(ax, P, XR, WY, track);
+      }
+    } else {
+      const gx = ex - engL / 2 - 80;
+      bv.part('Carter de convertisseur', S.cyl(330, 160, 'x', 40), { pos: [gx - 60, ey - 60, 0], mat: 'aluminium' });
+      bv.part('Convertisseur de couple', S.cyl(290, 110, 'x'), { pos: [gx - 60, ey - 60, 0], mat: 'acier' });
+      bv.part('Carter de boîte automatique', S.cyl(260, 560, 'x', 32, 200), { pos: [gx - 420, ey - 70, 0], mat: 'aluminium' });
+      bv.part('Carter d\'huile de boîte', S.box(400, 50, 240), { pos: [gx - 420, ey - 210, 0], mat: 'aluminium' });
+      bv.part('Bloc hydraulique (mécatronique)', S.box(300, 60, 200), { pos: [gx - 420, ey - 170, 0], mat: 'aluminium' });
+      boltCircle(bv, { n: 12, pcd: 300, d: 10, L: 40, axis: 'x', at: [gx + 20, ey - 60, 0], dir: 1, label: 'Vis de carter de boîte', couple: 45 });
+      const ax = gmp.group('Transmission arrière', { code: 'TRA' });
+      const sx = gx - 720;
+      ax.part('Arbre de transmission longitudinal', S.rod([sx, ey - 80, 0], [XR + 180, WY + (P.leaf ? 0 : 40), 0], 75, 65), { mat: 'acierHR' });
+      ax.part('Palier central', S.box(80, 100, 160), { pos: [(sx + XR) / 2, (ey + WY) / 2 - 20, 0], mat: 'caoutchouc' });
+      ax.part('Flector (joint élastique)', S.cyl(150, 40, 'x'), { pos: [sx + 10, ey - 80, 0], mat: 'caoutchouc' });
+      for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; ax.part(`Boulon de flector ${i + 1}`, S.bolt(12, 60, 'x'), { pos: [sx + 35, ey - 80 + Math.cos(a) * 55, Math.sin(a) * 55], mat: 'acierHR', couple: 90 }); }
+      rearDiff(ax, P, XR, WY, track);
+      if (P.drive === 'AWD') {
+        ax.part('Boîte de transfert', S.box(300, 260, 220), { pos: [gx - 820, ey - 60, -60], mat: 'aluminium' });
+        ax.part('Levier de crabotage 4×4', S.box(60, 60, 60), { pos: [gx - 820, ey + 100, -60], mat: 'acier' });
+        ax.part('Arbre de transmission avant', S.rod([gx - 820, ey - 120, -120], [XF + 40, WY + 60, -120], 55), { mat: 'acierHR' });
+        ax.part('Pont avant – différentiel', S.sphere(260), { pos: [XF + 40, WY + 60, -120], mat: 'fonte' });
+        for (const sd of SIDES) ax.part(`Arbre de roue avant ${sd.m}`, S.rod([XF + 40, WY + 60, -120 + sd.s * 120], [XF, WY, sd.s * (track / 2 - 110)], 34), { mat: 'acierHR' });
+      }
+    }
+    const ref = gmp.group('Refroidissement', { code: 'REF' });
+    const rh = Math.max(250, Math.min(420, nose - clr - 150));
+    ref.part('Radiateur', S.box(40, rh, W - 1100), { pos: [xF - 170, clr + (nose - clr) / 2, 0], mat: 'aluminium' });
+    ref.part('Motoventilateur', S.cyl(Math.min(330, rh), 60, 'x'), { pos: [xF - 230, clr + (nose - clr) / 2, 0], mat: 'plastique' });
+    ref.part('Condenseur de climatisation', S.box(25, rh - 30, W - 1140), { pos: [xF - 125, clr + (nose - clr) / 2, 0], mat: 'aluminium' });
+    ref.part('Vase d\'expansion', S.box(150, 140, 200), { pos: [xF - 450, hoodAt(xF - 450) - 150, halfW - 380], mat: 'composite' });
+    ref.part('Durite supérieure', S.pipe([[xF - 190, clr + (nose - clr) * 0.8, -150], [ex + 200, ey + 150, -80]], 38), { mat: 'caoutchouc' });
+
+    const al = gmp.group('Alimentation & électricité', { code: 'ALM' });
+    al.part('Boîte à air / filtre à air', S.box(260, 150, 320), { pos: [wsX + 200, hoodAt(wsX + 200) - 120, halfW - 520], mat: 'plastique' });
+    al.part('Batterie 12 V', S.box(242, 175, 175), { pos: [xF - 520, hoodAt(xF - 520) - 140, -(halfW - 300)], mat: 'electrolyte', desc: '12 V – 60 à 95 Ah' });
+    al.part('Borne + de batterie', S.cyl(18, 20, 'y'), { pos: [xF - 580, hoodAt(xF - 520) - 42, -(halfW - 300)], mat: 'cuivre' });
+    al.part('Calculateur moteur (ECU)', S.box(200, 40, 160), { pos: [wsX + 150, belt - 120, -(halfW - 350)], mat: 'aluminium' });
+    al.part(`Réservoir de carburant (${E.diesel ? 'gazole' : 'essence'})`, S.box(620, 230, Math.min(820, lw - 120)), { pos: [XR + 650, clr + 160, 0], mat: 'plastique', desc: 'PEHD multicouche' });
+    al.part('Pompe à carburant immergée', S.cyl(90, 200, 'y'), { pos: [XR + 650, clr + 200, 200], mat: 'plastique' });
+    al.part('Goulotte de remplissage', S.pipe([[XR + 500, clr + 220, 350], [XR - 100, clr + 450, halfW - 100], [XR - 250, belt - 150, halfW - 20]], 45), { mat: 'plastique' });
+    al.part('Canalisation de carburant', S.pipe([[XR + 650, clr + 230, 300], [0, clr + 120, 300], [ex - 100, ey, 200]], 10), { mat: 'inox' });
+
+    const ech = gmp.group('Ligne d\'échappement', { code: 'ECH' });
+    const ez = transverse ? 60 : 150;
+    const ex0 = transverse ? [ex + 150, ey - 120, 60] : [ex, ey - 150, halfW - 600];
+    ech.part('Tube avant', S.pipe([ex0, [ex0[0] - 200, clr + 80, ez], [XF - 300, clr + 60, ez]], 55), { mat: 'inox' });
+    ech.part(E.diesel ? 'Catalyseur + filtre à particules (FAP)' : 'Catalyseur 3 voies', S.cyl(140, 400, 'x'), { pos: [XF - 450, clr + 60, ez], mat: 'inox' });
+    ech.part('Sonde lambda', S.cyl(18, 60, 'y'), { pos: [XF - 250, clr + 110, ez], mat: 'inox' });
+    ech.part('Tube intermédiaire', S.pipe([[XF - 650, clr + 60, ez], [0, clr + 60, ez + 40], [XR + 200, clr + 120, halfW - 500]], 55), { mat: 'inox' });
+    ech.part('Silencieux intermédiaire', S.cyl(160, 400, 'x'), { pos: [-200, clr + 60, ez + 30], mat: 'inox' });
+    ech.part('Silencieux arrière', S.box(420, 220, 520), { pos: [xR + 380, clr + 140, halfW - 480], mat: 'inox' });
+    ech.part('Embout d\'échappement', S.cyl(85, 140, 'x'), { pos: [xR + 70, clr + 130, halfW - 380], mat: 'chrome' });
+    if (E.n >= 6) {
+      ech.part('Silencieux arrière gauche', S.box(420, 220, 520), { pos: [xR + 380, clr + 140, -(halfW - 480)], mat: 'inox' });
+      ech.part('Embout d\'échappement gauche', S.cyl(85, 140, 'x'), { pos: [xR + 70, clr + 130, -(halfW - 380)], mat: 'chrome' });
+    }
+  } else {
+    // Véhicule électrique
+    const bat = gmp.group('Batterie de traction 75 kWh', { code: 'BAT', desc: 'Lithium-ion NMC – 400 V – 8 modules' });
+    const bL = WB - 700, bW = W - 360;
+    bat.part('Carter inférieur de batterie', S.box(bL, 30, bW), { pos: [-60, clr + 20, 0], mat: 'aluminium' });
+    bat.part('Couvercle de batterie', S.box(bL, 8, bW), { pos: [-60, clr + 150, 0], mat: 'aluminium' });
+    for (let i = 0; i < 4; i++) for (const sd of SIDES) {
+      const mx = -60 - bL / 2 + bL / 8 + i * bL / 4;
+      bat.part(`Module ${i + 1}${sd.c}`, S.box(bL / 4 - 40, 100, bW / 2 - 60), { pos: [mx, clr + 85, sd.s * bW / 4], mat: 'peinture', color: 0x2a4a7a });
+    }
+    bat.part('Plaque de refroidissement liquide', S.box(bL - 40, 6, bW - 40), { pos: [-60, clr + 38, 0], mat: 'aluminium' });
+    bat.part('Gestionnaire de batterie (BMS)', S.box(250, 40, 180), { pos: [-60 + bL / 2 - 200, clr + 130, 0], mat: 'abs' });
+    bat.part('Connecteur haute tension', S.box(120, 80, 160), { pos: [-60 - bL / 2 - 40, clr + 90, 0], mat: 'abs', color: 0xff7a00 });
+    for (const sd of SIDES) boltRow(bat, { from: [-60 - bL / 2 + 60, clr + 5, sd.s * (bW / 2 - 15)], to: [-60 + bL / 2 - 60, clr + 5, sd.s * (bW / 2 - 15)], n: 10, d: 10, L: 40, axis: 'y', dir: -1, label: `Vis de fixation de batterie ${sd.c}`, couple: 50 });
+    const mot = gmp.group('Moteur électrique arrière', { code: 'MEL' });
+    mot.part('Stator', S.cyl(260, 280, 'z'), { pos: [XR - 80, WY + 40, -120], mat: 'aluminium', desc: 'Moteur synchrone à aimants permanents – 210 kW' });
+    mot.part('Rotor', S.cyl(160, 260, 'z'), { pos: [XR - 80, WY + 40, -120], mat: 'acier' });
+    mot.part('Réducteur 1 rapport (9:1)', S.box(260, 300, 200), { pos: [XR, WY + 20, 120], mat: 'aluminium' });
+    mot.part('Onduleur', S.box(300, 120, 400), { pos: [XR - 60, WY + 250, 0], mat: 'aluminium' });
+    mot.part('Câbles haute tension', S.pipe([[-60 - bL / 2 - 40, clr + 90, 0], [XR + 150, clr + 200, 50], [XR - 60, WY + 200, 0]], 28), { mat: 'plastique', color: 0xff7a00 });
+    for (const sd of SIDES) {
+      mot.part(`Arbre de roue ${sd.m}`, S.rod([XR, WY + 20, sd.s * 140], [XR, WY, sd.s * (track / 2 - 110)], 30), { mat: 'acierHR' });
+      mot.part(`Écrou de moyeu arrière ${sd.m}`, S.nut(22, 'z'), { pos: [XR, WY, sd.s * (track / 2 - 70)], mat: 'acierHR', couple: '330 N·m' });
+    }
+    boltCircle(mot, { n: 8, pcd: 220, d: 8, L: 30, axis: 'z', at: [XR - 80, WY + 40, -265], dir: -1, label: 'Vis de flasque moteur', kind: 'cap', couple: 25 });
+    const ch2 = gmp.group('Recharge & électronique', { code: 'ELE' });
+    ch2.part('Chargeur embarqué 11 kW', S.box(350, 100, 300), { pos: [xF - 600, hoodAt(xF - 600) - 160, 0], mat: 'aluminium' });
+    ch2.part('Convertisseur DC/DC 12 V', S.box(200, 80, 200), { pos: [xF - 600, hoodAt(xF - 600) - 300, 250], mat: 'aluminium' });
+    ch2.part('Prise de recharge Combo CCS2', S.box(40, 120, 100), { pos: [xR + 300, belt - 160, -(halfW + 2)], mat: 'abs', color: 0x111111 });
+    ch2.part('Batterie 12 V auxiliaire', S.box(200, 160, 170), { pos: [xF - 350, hoodAt(xF - 350) - 140, -(halfW - 300)], mat: 'electrolyte' });
+    ch2.part('Coffre avant (frunk)', S.box(500, 220, W - 600), { pos: [xF - 400, hoodAt(xF - 400) - 160, 0], mat: 'plastique', layer: 'int' });
+    const ref = gmp.group('Gestion thermique', { code: 'REF' });
+    ref.part('Radiateur basse température', S.box(40, Math.max(250, Math.min(380, nose - clr - 150)), W - 1100), { pos: [xF - 170, clr + (nose - clr) / 2, 0], mat: 'aluminium' });
+    ref.part('Pompe à chaleur (compresseur électrique)', S.cyl(120, 160, 'z'), { pos: [xF - 500, clr + 250, -300], mat: 'aluminium' });
+    ref.part('Vanne multivoies de circuit thermique', S.box(150, 150, 150), { pos: [xF - 500, clr + 250, 200], mat: 'abs' });
   }
-  const tr = gmp.group('Transmissions', { code: 'TRA' });
-  for (const sd of SIDES) {
-    const zIn = sd.s < 0 ? -560 : -100;
-    tr.part(`Arbre de transmission ${sd.m}`, S.rod([1440, 400, zIn], [XF, WY, sd.s * 650], 30), { mat: 'acierHR' });
-    tr.part(`Joint homocinétique côté roue ${sd.m}`, S.cyl(95, 90, 'z'), { pos: [XF, WY, sd.s * 640], mat: 'caoutchouc', desc: 'Joint Rzeppa + soufflet' });
-    tr.part(`Tripode côté boîte ${sd.m}`, S.cyl(90, 80, 'z'), { pos: [1430, 400, zIn + sd.s * 30], mat: 'caoutchouc' });
-    tr.part(`Écrou de moyeu ${sd.m}`, S.nut(22, 'z'), { pos: [XF, WY, sd.s * 700], mat: 'acierHR', couple: '280 N·m' });
-  }
-
-  const ref = gmp.group('Refroidissement', { code: 'REF' });
-  ref.part('Radiateur', S.box(40, 420, 660), { pos: [2120, 560, 0], mat: 'aluminium' });
-  ref.part('Motoventilateur', S.cyl(330, 60, 'x'), { pos: [2060, 560, 0], mat: 'plastique' });
-  ref.part('Vase d\'expansion', S.box(150, 140, 200), { pos: [1850, 800, 500], mat: 'composite' });
-  ref.part('Durite supérieure', S.pipe([[2100, 720, -150], [1900, 760, -100], [1700, 780, -60]], 38), { mat: 'caoutchouc' });
-  ref.part('Durite inférieure', S.pipe([[2100, 380, 150], [1900, 360, 120], [1680, 440, 80]], 38), { mat: 'caoutchouc' });
-  ref.part('Condenseur de climatisation', S.box(25, 380, 640), { pos: [2165, 560, 0], mat: 'aluminium' });
-  ref.part('Compresseur de climatisation', S.cyl(120, 160, 'z'), { pos: [1700, 420, 260], mat: 'aluminium' });
-
-  const al = gmp.group('Alimentation & électricité', { code: 'ALM' });
-  al.part('Boîte à air / filtre à air', S.box(260, 150, 320), { pos: [1180, 830, 300], mat: 'plastique' });
-  al.part('Élément filtrant', S.box(200, 40, 260), { pos: [1180, 840, 300], mat: 'tissu', color: 0xe9d8a0 });
-  al.part('Conduit d\'admission', S.pipe([[1180, 830, 140], [1250, 820, 50], [1350, 800, 0]], 70), { mat: 'caoutchouc' });
-  al.part('Batterie 12 V 60 Ah', S.box(242, 175, 175), { pos: [1700, 760, 590], mat: 'electrolyte', desc: '12 V – 60 Ah – 540 A EN' });
-  al.part('Borne + de batterie', S.cyl(18, 20, 'y'), { pos: [1640, 858, 640], mat: 'cuivre' });
-  al.part('Borne − de batterie', S.cyl(17, 20, 'y'), { pos: [1760, 858, 640], mat: 'laiton' });
-  al.part('Bride de batterie', S.box(260, 10, 30), { pos: [1700, 852, 590], mat: 'acier' });
-  al.part('Calculateur moteur (ECU)', S.box(200, 40, 160), { pos: [1300, 840, -500], mat: 'aluminium' });
-  al.part('Boîte à fusibles', S.box(150, 80, 200), { pos: [1300, 840, 600], mat: 'abs' });
-  al.part('Réservoir de carburant 50 L', S.box(620, 230, 820), { pos: [-1050, 330, 0], mat: 'plastique', desc: 'PEHD multicouche – 50 L' });
-  al.part('Pompe à carburant immergée', S.cyl(90, 200, 'y'), { pos: [-1050, 360, 250], mat: 'plastique' });
-  al.part('Goulotte de remplissage', S.pipe([[-1300, 380, 400], [-1600, 600, 700], [-1700, 820, 860]], 45), { mat: 'plastique' });
-  al.part('Trappe à carburant', S.cyl(170, 6, 'z'), { pos: [-1700, 840, 892], mat: 'peinture', color: PAINT });
-  al.part('Canalisation de carburant', S.pipe([[-1050, 380, 300], [0, 300, 300], [1000, 380, 300], [1300, 750, 0]], 10), { mat: 'inox' });
-
-  const ech = gmp.group('Ligne d\'échappement', { code: 'ECH' });
-  const ex = [[1700, 400, 60], [1640, 280, 60], [1300, 220, 60], [600, 210, 80], [-500, 210, 120], [-1300, 290, 300], [-1700, 290, 380]];
-  ech.part('Tube avant', S.pipe(ex.slice(0, 4), 55), { mat: 'inox' });
-  ech.part('Catalyseur', S.cyl(140, 320, 'x'), { pos: [1300, 220, 60], mat: 'inox', desc: 'Catalyseur 3 voies + filtre à particules essence' });
-  ech.part('Sonde lambda amont', S.cyl(18, 60, 'y'), { pos: [1520, 270, 60], mat: 'inox' });
-  ech.part('Sonde lambda aval', S.cyl(18, 60, 'y'), { pos: [1080, 260, 60], mat: 'inox' });
-  ech.part('Tube intermédiaire', S.pipe(ex.slice(3), 55), { mat: 'inox' });
-  ech.part('Silencieux intermédiaire', S.cyl(160, 400, 'x'), { pos: [0, 210, 100], mat: 'inox' });
-  ech.part('Silencieux arrière', S.box(420, 220, 520), { pos: [-1900, 300, 420], mat: 'inox' });
-  ech.part('Embout d\'échappement', S.cyl(80, 120, 'x'), { pos: [-2190, 290, 520], mat: 'chrome' });
-  for (const [i, x] of [[1, 900], [2, -800], [3, -1700]]) ech.part(`Silent-bloc de suspension d'échappement ${i}`, S.cyl(40, 25, 'z'), { pos: [x, 240, 200], mat: 'caoutchouc' });
-  ech.part('Collier de serrage', S.tube(70, 56, 30, 'x'), { pos: [600, 210, 80], mat: 'inox' });
 
   // ------------------------------------------------------------------ Liaisons au sol
-  const ls = car.group('Liaisons au sol', { code: 'LAS' });
+  const ls = car.group('Liaisons au sol', { code: 'LAS', layer: 'sol' });
+  const [dF, dR] = P.disc;
   for (const [ax, nomAx] of [[XF, 'avant'], [XR, 'arrière']]) {
     for (const sd of SIDES) {
+      const drum = ax < 0 && P.drumRear;
       wheel(ls, `Roue ${nomAx} ${sd.f}`, sd.s, {
-        pos: [ax, WY, sd.s * TRACK / 2], tire: [205, 55, 16], studs: 5, pcd: 108, stud: 12, studL: 26, couple: 110,
-        disc: ax > 0 ? [283, 26] : [268, 12], caliperAngle: ax > 0 ? 150 : 30, code: 'ROU', hubD: 120,
+        pos: [ax, WY, sd.s * track / 2], tire: P.tire, studs: P.frame ? 6 : 5, pcd: P.frame ? 139.7 : 112, stud: P.frame ? 14 : 12, studL: 28, couple: P.frame ? 140 : 120,
+        disc: drum ? null : ax > 0 ? dF : dR, drum: drum ? dR : null, caliperAngle: ax > 0 ? 150 : 30, code: 'ROU', hubD: P.frame ? 160 : 120, spokes: P.frame ? 6 : 5,
+        caliperColor: P.drive === 'RWD' ? 0xd4a017 : 0x2a2c30,
       });
     }
   }
   const sav = ls.group('Train avant pseudo-McPherson', { code: 'TAV' });
+  const topY = Math.min(hoodAt(XF - 65) - 45, WY + 560);
   for (const sd of SIDES) {
-    const z = sd.s * 640;
+    const z = sd.s * (track / 2 - 135);
     const g = sav.group(`Jambe de force ${sd.f}`, { code: 'TAV' });
-    g.part('Amortisseur', S.rod([XF - 20, 420, z], [XF - 60, 900, sd.s * 600], 52), { mat: 'peinture', color: 0x222222 });
-    g.part('Tige d\'amortisseur', S.rod([XF - 60, 900, sd.s * 600], [XF - 65, 960, sd.s * 595], 22), { mat: 'chrome' });
-    g.part('Ressort hélicoïdal', S.spring(150, 13, 300, 6), { pos: [XF - 45, 740, sd.s * 615], mat: 'peinture', color: 0xd8b10f });
-    g.part('Coupelle supérieure', S.cyl(160, 30, 'y'), { pos: [XF - 65, 960, sd.s * 595], mat: 'acier' });
-    g.part('Butée à billes', S.tube(130, 40, 20, 'y'), { pos: [XF - 60, 940, sd.s * 597], mat: 'acier' });
-    for (let i = 0; i < 3; i++) {
-      const a = (i / 3) * Math.PI * 2;
-      g.part(`Écrou de coupelle ${i + 1}`, S.nut(8), { pos: [XF - 65 + Math.cos(a) * 55, 980, sd.s * 595 + Math.sin(a) * 55], mat: 'zingue', couple: 25 });
-    }
-    g.part('Pivot / porte-moyeu', S.box(80, 260, 80), { pos: [XF, WY + 20, sd.s * 690], mat: 'fonte' });
-    g.part('Vis de pivot sur jambe 1', S.bolt(14, 80, 'x'), { pos: [XF + 50, 450, z], mat: 'acierHR', couple: 200 });
-    g.part('Vis de pivot sur jambe 2', S.bolt(14, 80, 'x'), { pos: [XF + 50, 400, z], mat: 'acierHR', couple: 200 });
+    g.part('Amortisseur', S.rod([XF - 20, WY + 100, z], [XF - 60, topY - 60, z - sd.s * 40], 52), { mat: 'peinture', color: 0x222222 });
+    g.part('Tige d\'amortisseur', S.rod([XF - 60, topY - 60, z - sd.s * 40], [XF - 65, topY, z - sd.s * 45], 22), { mat: 'chrome' });
+    g.part('Ressort hélicoïdal', S.spring(150, 13, (topY - WY) * 0.55, 6), { pos: [XF - 45, WY + (topY - WY) * 0.62, z - sd.s * 25], mat: 'peinture', color: 0xd8b10f });
+    g.part('Coupelle supérieure', S.cyl(160, 30, 'y'), { pos: [XF - 65, topY, z - sd.s * 45], mat: 'acier' });
+    for (let i = 0; i < 3; i++) { const a = (i / 3) * Math.PI * 2; g.part(`Écrou de coupelle ${i + 1}`, S.nut(8), { pos: [XF - 65 + Math.cos(a) * 55, topY + 20, z - sd.s * 45 + Math.sin(a) * 55], mat: 'zingue', couple: 25 }); }
+    g.part('Pivot / porte-moyeu', S.box(80, 260, 80), { pos: [XF, WY + 20, sd.s * (track / 2 - 85)], mat: 'fonte' });
+    for (const k of [1, 2]) g.part(`Vis de pivot sur jambe ${k}`, S.bolt(14, 80, 'x'), { pos: [XF + 50, WY + 130 - k * 50, z], mat: 'acierHR', couple: 200 });
     const tr2 = sav.group(`Triangle inférieur ${sd.m}`, { code: 'TAV' });
-    tr2.part('Bras avant', S.rod([XF, 230, sd.s * 690], [XF + 120, 240, sd.s * 360], 35), { mat: 'acier' });
-    tr2.part('Bras arrière', S.rod([XF, 230, sd.s * 690], [XF - 250, 240, sd.s * 380], 35), { mat: 'acier' });
-    tr2.part('Rotule de triangle', S.sphere(45), { pos: [XF, 230, sd.s * 690], mat: 'acier' });
-    tr2.part('Silent-bloc avant', S.tube(60, 20, 50, 'x'), { pos: [XF + 120, 240, sd.s * 360], mat: 'caoutchouc' });
-    tr2.part('Silent-bloc arrière', S.tube(70, 20, 60, 'y'), { pos: [XF - 250, 240, sd.s * 380], mat: 'caoutchouc' });
-    tr2.part('Vis de silent-bloc avant', S.bolt(12, 80, 'x'), { pos: [XF + 160, 240, sd.s * 360], mat: 'acierHR', couple: '100 N·m + 90°' });
-    tr2.part('Vis de silent-bloc arrière', S.bolt(12, 90, 'y'), { pos: [XF - 250, 190, sd.s * 380], rot: [180, 0, 0], mat: 'acierHR', couple: '120 N·m + 90°' });
-    tr2.part('Écrou de rotule', S.nut(14), { pos: [XF, 190, sd.s * 690], mat: 'acierHR', couple: 70 });
+    const ty = clr + 70;
+    tr2.part('Bras avant', S.rod([XF, ty, sd.s * (track / 2 - 85)], [XF + 120, ty + 10, sd.s * (lw / 2 - 160)], 35), { mat: 'acier' });
+    tr2.part('Bras arrière', S.rod([XF, ty, sd.s * (track / 2 - 85)], [XF - 250, ty + 10, sd.s * (lw / 2 - 140)], 35), { mat: 'acier' });
+    tr2.part('Rotule de triangle', S.sphere(45), { pos: [XF, ty, sd.s * (track / 2 - 85)], mat: 'acier' });
+    tr2.part('Silent-bloc avant', S.tube(60, 20, 50, 'x'), { pos: [XF + 120, ty + 10, sd.s * (lw / 2 - 160)], mat: 'caoutchouc' });
+    tr2.part('Vis de silent-bloc avant', S.bolt(12, 80, 'x'), { pos: [XF + 160, ty + 10, sd.s * (lw / 2 - 160)], mat: 'acierHR', couple: '100 N·m + 90°' });
+    tr2.part('Vis de silent-bloc arrière', S.bolt(12, 90, 'y'), { pos: [XF - 250, ty - 40, sd.s * (lw / 2 - 140)], rot: [180, 0, 0], mat: 'acierHR', couple: '120 N·m + 90°' });
+    tr2.part('Écrou de rotule', S.nut(14), { pos: [XF, ty - 40, sd.s * (track / 2 - 85)], mat: 'acierHR', couple: 70 });
   }
-  sav.part('Barre stabilisatrice avant', S.pipe([[XF - 180, 280, -620], [XF - 150, 300, -300], [XF - 150, 300, 300], [XF - 180, 280, 620]], 22), { mat: 'peinture', color: 0x222222 });
-  for (const sd of SIDES) sav.part(`Biellette de barre stabilisatrice ${sd.f}`, S.rod([XF - 180, 280, sd.s * 620], [XF - 40, 560, sd.s * 630], 14), { mat: 'acier' });
-
+  sav.part('Barre stabilisatrice avant', S.pipe([[XF - 180, clr + 120, -(track / 2 - 155)], [XF - 150, clr + 140, -200], [XF - 150, clr + 140, 200], [XF - 180, clr + 120, track / 2 - 155]], 22), { mat: 'peinture', color: 0x222222 });
   const dir = ls.group('Direction', { code: 'DIR' });
-  dir.part('Crémaillère de direction assistée', S.cyl(60, 720, 'z'), { pos: [XF - 160, 360, 0], mat: 'aluminium' });
-  dir.part('Moteur d\'assistance électrique', S.cyl(90, 180, 'x'), { pos: [XF - 260, 380, -200], mat: 'aluminium' });
+  dir.part('Crémaillère de direction assistée', S.cyl(60, lw - 100, 'z'), { pos: [XF - 160, clr + 200, 0], mat: 'aluminium' });
+  dir.part('Moteur d\'assistance électrique', S.cyl(90, 180, 'x'), { pos: [XF - 260, clr + 220, -200], mat: 'aluminium' });
   for (const sd of SIDES) {
-    dir.part(`Biellette de direction ${sd.f}`, S.rod([XF - 160, 360, sd.s * 360], [XF - 120, 380, sd.s * 690], 18), { mat: 'acierHR' });
-    dir.part(`Rotule de direction ${sd.f}`, S.sphere(40), { pos: [XF - 120, 380, sd.s * 690], mat: 'acier' });
-    dir.part(`Soufflet de crémaillère ${sd.m}`, S.cyl(55, 120, 'z', 16, 30), { pos: [XF - 160, 360, sd.s * 420], rot: sd.s > 0 ? [0, 0, 0] : [180, 0, 0], mat: 'caoutchouc' });
-    dir.part(`Contre-écrou de biellette ${sd.f}`, S.nut(14, 'z'), { pos: [XF - 140, 370, sd.s * 520], mat: 'zingue', couple: 50 });
+    dir.part(`Biellette de direction ${sd.f}`, S.rod([XF - 160, clr + 200, sd.s * (lw / 2 - 50)], [XF - 120, WY + 60, sd.s * (track / 2 - 85)], 18), { mat: 'acierHR' });
+    dir.part(`Rotule de direction ${sd.f}`, S.sphere(40), { pos: [XF - 120, WY + 60, sd.s * (track / 2 - 85)], mat: 'acier' });
+    dir.part(`Contre-écrou de biellette ${sd.f}`, S.nut(14, 'z'), { pos: [XF - 140, clr + 210, sd.s * (lw / 2 + 50)], mat: 'zingue', couple: 50 });
   }
-  dir.part('Colonne de direction', S.rod([XF - 220, 400, -300], [430, 980, -370], 30), { mat: 'acier' });
-  dir.part('Cardan de colonne', S.sphere(45), { pos: [XF - 220, 400, -300], mat: 'acier' });
+  const swX = wsX - 520;
+  dir.part('Colonne de direction', S.rod([XF - 220, clr + 240, -300], [swX + 20, belt + 20, -(cabW / 2 - 310)], 30), { mat: 'acier' });
 
-  const sar = ls.group('Train arrière à traverse déformable', { code: 'TAR' });
-  sar.part('Traverse déformable', S.box(110, 90, 1300), { pos: [XR + 300, 290, 0], mat: 'acier' });
-  for (const sd of SIDES) {
-    sar.part(`Bras tiré ${sd.m}`, S.rod([XR + 650, 300, sd.s * 640], [XR, WY, sd.s * 640], 60), { mat: 'acier' });
-    sar.part(`Silent-bloc de bras ${sd.m}`, S.tube(80, 20, 60, 'z'), { pos: [XR + 650, 300, sd.s * 640], mat: 'caoutchouc' });
-    sar.part(`Vis d'articulation de bras ${sd.m}`, S.bolt(14, 110, 'z'), { pos: [XR + 650, 300, sd.s * 700], rot: axisRot('z', sd.s), mat: 'acierHR', couple: 110 });
-    sar.part(`Amortisseur arrière ${sd.m}`, S.rod([XR - 80, 300, sd.s * 600], [XR - 140, 760, sd.s * 580], 48), { mat: 'peinture', color: 0x222222 });
-    sar.part(`Ressort arrière ${sd.m}`, S.spring(140, 12, 260, 6), { pos: [XR + 150, 440, sd.s * 600], mat: 'peinture', color: 0xd8b10f });
-    sar.part(`Vis d'amortisseur inférieure ${sd.m}`, S.bolt(12, 70, 'z'), { pos: [XR - 80, 300, sd.s * 640], rot: axisRot('z', sd.s), mat: 'acierHR', couple: 75 });
-    sar.part(`Fusée arrière ${sd.f}`, S.cyl(45, 120, 'z'), { pos: [XR, WY, sd.s * 690], mat: 'acierHR' });
+  const rearName = P.leaf ? 'Pont arrière rigide à lames' : P.drive === 'FWD' ? 'Train arrière à traverse déformable' : 'Train arrière multibras';
+  const sar = ls.group(rearName, { code: 'TAR' });
+  if (P.leaf) {
+    for (const sd of SIDES) {
+      const lz = sd.s * (lw / 2);
+      const lg = sar.group(`Ressort à lames ${sd.m}`, { code: 'TAR' });
+      for (let k = 0; k < 4; k++) lg.part(`Lame ${k + 1}`, S.box(1300 - k * 250, 12, 60), { pos: [XR, WY - 60 - k * 12, lz], mat: 'acierHR', color: 0x1c1d20 });
+      lg.part('Main de ressort avant', S.box(80, 120, 70), { pos: [XR + 650, WY, lz], mat: 'acier' });
+      lg.part('Jumelle de ressort', S.box(40, 140, 70), { pos: [XR - 650, WY, lz], mat: 'acier' });
+      for (const k of [1, 2]) for (const dz of [-1, 1]) lg.part(`Écrou d'étrier en U ${k}${dz < 0 ? 'a' : 'b'}`, S.nut(14), { pos: [XR + (k === 1 ? -50 : 50), WY - 130, lz + dz * 40], rot: [180, 0, 0], mat: 'acierHR', couple: 130 });
+      sar.part(`Amortisseur arrière ${sd.m}`, S.rod([XR - 120, WY - 40, lz + sd.s * 40], [XR - 200, ly + 80, lz - sd.s * 10], 50), { mat: 'peinture', color: 0x222222 });
+    }
+  } else if (P.drive === 'FWD') {
+    sar.part('Traverse déformable', S.box(110, 90, track - 240), { pos: [XR + 300, WY - 30, 0], mat: 'acier' });
+    for (const sd of SIDES) {
+      const z = sd.s * (track / 2 - 135);
+      sar.part(`Bras tiré ${sd.m}`, S.rod([XR + 650, WY - 20, z], [XR, WY, z], 60), { mat: 'acier' });
+      sar.part(`Vis d'articulation de bras ${sd.m}`, S.bolt(14, 110, 'z'), { pos: [XR + 650, WY - 20, z + sd.s * 60], rot: axisRot('z', sd.s), mat: 'acierHR', couple: 110 });
+      sar.part(`Amortisseur arrière ${sd.m}`, S.rod([XR - 80, WY - 20, z - sd.s * 40], [XR - 140, WY + 440, z - sd.s * 60], 48), { mat: 'peinture', color: 0x222222 });
+      sar.part(`Ressort arrière ${sd.m}`, S.spring(140, 12, 260, 6), { pos: [XR + 150, WY + 120, z - sd.s * 40], mat: 'peinture', color: 0xd8b10f });
+      sar.part(`Fusée arrière ${sd.f}`, S.cyl(45, 120, 'z'), { pos: [XR, WY, sd.s * (track / 2 - 85)], mat: 'acierHR' });
+    }
+  } else {
+    sar.part('Berceau arrière', S.box(500, 70, lw - 60), { pos: [XR, clr + 120, 0], mat: 'acier', layer: 'struct' });
+    for (const sd of SIDES) {
+      const z = sd.s * (track / 2 - 135);
+      sar.part(`Porte-moyeu arrière ${sd.m}`, S.box(90, 240, 80), { pos: [XR, WY + 10, sd.s * (track / 2 - 90)], mat: 'aluminium' });
+      sar.part(`Bras supérieur ${sd.m}`, S.rod([XR, WY + 140, z], [XR + 80, WY + 170, sd.s * (lw / 2 - 120)], 25), { mat: 'aluminium' });
+      sar.part(`Bras inférieur ${sd.m}`, S.rod([XR, WY - 90, z], [XR + 150, clr + 100, sd.s * (lw / 2 - 120)], 30), { mat: 'acier' });
+      sar.part(`Biellette de pincement ${sd.m}`, S.rod([XR - 100, WY - 50, z], [XR - 150, clr + 110, sd.s * (lw / 2 - 120)], 20), { mat: 'acier' });
+      sar.part(`Bras de traction ${sd.m}`, S.rod([XR + 50, WY - 60, z], [XR + 500, clr + 120, sd.s * (lw / 2)], 30), { mat: 'acier' });
+      sar.part(`Amortisseur arrière ${sd.m}`, S.rod([XR - 60, WY - 60, z - sd.s * 30], [XR - 120, WY + 430, z - sd.s * 50], 48), { mat: 'peinture', color: 0x222222 });
+      sar.part(`Ressort arrière ${sd.m}`, S.spring(130, 12, 240, 6), { pos: [XR + 160, WY + 70, z - sd.s * 50], mat: 'peinture', color: 0xd8b10f });
+      for (const k of ['supérieur', 'inférieur']) sar.part(`Vis d'ancrage bras ${k} ${sd.m}`, S.bolt(12, 80, 'x'), { pos: [XR + (k === 'supérieur' ? 80 : 150), k === 'supérieur' ? WY + 170 : clr + 100, sd.s * (lw / 2 - 120)], mat: 'acierHR', couple: '90 N·m + 90°' });
+    }
   }
 
   // ------------------------------------------------------------------ Habitacle
-  const hab = car.group('Habitacle', { code: 'HAB' });
-  for (const sd of SIDES) seat(hab, `Siège avant ${sd.m}`, [-150, 340, sd.s * 370], { code: 'SIE', w: 520 });
-  const banq = hab.group('Banquette arrière', { code: 'SIE' });
-  banq.part('Assise de banquette', S.box(480, 120, 1300), { pos: [-1020, 400, 0], mat: 'tissu' });
-  banq.part('Dossier de banquette 60 %', S.box(110, 600, 770), { pos: [-1280, 720, -250], rot: [0, 0, -15], mat: 'tissu' });
-  banq.part('Dossier de banquette 40 %', S.box(110, 600, 520), { pos: [-1280, 720, 400], rot: [0, 0, -15], mat: 'tissu' });
-  const pb = hab.group('Planche de bord', { code: 'PDB' });
-  pb.part('Planche de bord', S.box(320, 230, 1560), { pos: [770, 920, 0], mat: 'abs', color: 0x1f2124 });
-  pb.part('Combiné d\'instruments', S.box(30, 120, 300), { pos: [600, 1010, -370], rot: [0, 0, -10], mat: 'ecran' });
-  pb.part('Écran multimédia 9"', S.box(20, 130, 220), { pos: [620, 1050, 0], rot: [0, 0, -10], mat: 'ecran' });
-  pb.part('Aérateur central', S.box(20, 50, 200), { pos: [615, 960, 0], mat: 'abs' });
-  pb.part('Boîte à gants', S.box(30, 160, 450), { pos: [610, 860, 380], mat: 'abs', color: 0x1f2124 });
-  pb.part('Traverse de planche de bord', S.cyl(60, 1450, 'z'), { pos: [800, 880, 0], mat: 'acier' });
-  pb.part('Module airbag passager', S.box(150, 90, 300), { pos: [760, 1020, 380], mat: 'abs' });
-  const vol = hab.group('Poste de conduite', { code: 'PDC' });
-  vol.part('Volant', S.torus(370, 30, 'x'), { pos: [440, 990, -370], rot: [0, 0, -22], mat: 'cuir', color: 0x151515 });
-  vol.part('Moyeu de volant / airbag conducteur', S.cyl(160, 80, 'x'), { pos: [450, 990, -370], rot: [0, 0, -22], mat: 'abs' });
-  vol.part('Écrou de volant', S.nut(16, 'x'), { pos: [480, 1000, -370], rot: [0, 0, -22], mat: 'acierHR', couple: 50 });
-  vol.part('Levier de vitesses', S.rod([350, 520, 0], [300, 720, 0], 16), { mat: 'chrome' });
-  vol.part('Pommeau de levier', S.sphere(55), { pos: [300, 730, 0], mat: 'cuir', color: 0x151515 });
-  vol.part('Frein de stationnement', S.box(250, 40, 50), { pos: [100, 520, 0], rot: [0, 0, 15], mat: 'abs' });
-  for (const [i, nom, z] of [[0, 'Pédale d\'embrayage', -500], [1, 'Pédale de frein', -380], [2, 'Pédale d\'accélérateur', -260]]) {
-    void i;
-    vol.part(nom, S.box(20, 90, 70), { pos: [800, 480, z], rot: [0, 0, 20], mat: 'caoutchouc' });
-    vol.part(`Bras de ${nom.toLowerCase()}`, S.rod([800, 480, z], [860, 760, z], 16), { mat: 'acier' });
+  const hab = car.group('Habitacle', { code: 'HAB', layer: 'int' });
+  const sY = floorY + 30;
+  const fsX = bX + 150;
+  const luxe = P.drive === 'RWD' || P.drive === 'EV';
+  for (const sd of SIDES) seat(hab, `Siège avant ${sd.m}`, [fsX, sY, sd.s * (cabW / 2 - 300)], { code: 'SIE', w: Math.min(540, cabW / 2 - 60), mat: luxe ? 'cuir' : 'tissu', color: luxe ? 0x161616 : undefined });
+  const rows = P.rear === 'pickup' || P.doors === 2 ? Math.min(P.rows, 2) : P.rows;
+  for (let r = 1; r < rows; r++) {
+    const bx = fsX - 880 * r;
+    if (bx - 300 < Math.max(cR, xR + 200) && P.rear !== 'wagon' && P.rear !== 'hatch') continue;
+    const banq = hab.group(r === 1 ? 'Banquette arrière' : `Sièges ${r + 1}e rang`, { code: 'SIE' });
+    banq.part('Assise', S.box(460, 120, cabW - 160), { pos: [bx, sY + 60, 0], mat: 'tissu' });
+    banq.part('Dossier 60 %', S.box(110, 560, (cabW - 160) * 0.6), { pos: [bx - 250, sY + 360, -(cabW - 160) * 0.2], rot: [0, 0, -15], mat: 'tissu' });
+    banq.part('Dossier 40 %', S.box(110, 560, (cabW - 160) * 0.4), { pos: [bx - 250, sY + 360, (cabW - 160) * 0.3], rot: [0, 0, -15], mat: 'tissu' });
+    banq.part('Ancrage ISOFIX', S.box(30, 30, 300), { pos: [bx - 200, sY + 70, -(cabW / 2 - 300)], mat: 'acier' });
   }
-  vol.part('Maître-cylindre de frein', S.cyl(60, 200, 'x'), { pos: [1050, 760, -380], mat: 'aluminium' });
-  vol.part('Servofrein', S.cyl(250, 120, 'x'), { pos: [990, 760, -380], mat: 'peinture', color: 0x222222 });
-  vol.part('Réservoir de liquide de frein', S.box(100, 80, 80), { pos: [1080, 850, -380], mat: 'composite' });
+  const pb = hab.group('Planche de bord', { code: 'PDB' });
+  pb.part('Planche de bord', S.box(320, 230, cabW - 20), { pos: [wsX - 180, belt - 30, 0], mat: 'abs', color: 0x1f2124 });
+  pb.part('Combiné d\'instruments', S.box(30, 120, 300), { pos: [wsX - 350, belt + 60, -(cabW / 2 - 310)], rot: [0, 0, -10], mat: 'ecran' });
+  pb.part('Écran multimédia', S.box(20, 150, 260), { pos: [wsX - 340, belt + 100, 0], rot: [0, 0, -10], mat: 'ecran' });
+  pb.part('Traverse de planche de bord', S.cyl(60, cabW - 100, 'z'), { pos: [wsX - 150, belt - 70, 0], mat: 'acier', layer: 'struct' });
+  pb.part('Module airbag passager', S.box(150, 90, 300), { pos: [wsX - 190, belt + 70, cabW / 2 - 310], mat: 'abs' });
+  const vol = hab.group('Poste de conduite', { code: 'PDC' });
+  vol.part('Volant', S.torus(370, 30, 'x'), { pos: [swX, belt + 30, -(cabW / 2 - 310)], rot: [0, 0, -22], mat: 'cuir', color: 0x151515 });
+  vol.part('Moyeu de volant / airbag conducteur', S.cyl(160, 80, 'x'), { pos: [swX + 10, belt + 30, -(cabW / 2 - 310)], rot: [0, 0, -22], mat: 'abs' });
+  vol.part('Écrou de volant', S.nut(16, 'x'), { pos: [swX + 40, belt + 40, -(cabW / 2 - 310)], rot: [0, 0, -22], mat: 'acierHR', couple: 50 });
+  const manual = P.eng && P.drive === 'FWD';
+  vol.part(manual ? 'Levier de vitesses' : 'Sélecteur de marche', S.rod([fsX + 150, sY + 200, 0], [fsX + 100, sY + 380, 0], 16), { mat: 'chrome' });
+  const pedals = manual ? ['Pédale d\'embrayage', 'Pédale de frein', 'Pédale d\'accélérateur'] : ['Pédale de frein', 'Pédale d\'accélérateur'];
+  pedals.forEach((n, i) => {
+    const pz = -(cabW / 2 - 200) + i * 120;
+    vol.part(n, S.box(20, 90, 70), { pos: [wsX - 150, sY + 150, pz], rot: [0, 0, 20], mat: 'caoutchouc' });
+    vol.part(`Bras de ${n.toLowerCase()}`, S.rod([wsX - 150, sY + 150, pz], [wsX - 90, sY + 430, pz], 16), { mat: 'acier' });
+  });
+  vol.part('Maître-cylindre de frein', S.cyl(60, 200, 'x'), { pos: [wsX + 100, belt - 190, -(cabW / 2 - 320)], mat: 'aluminium', layer: 'meca' });
+  vol.part('Servofrein', S.cyl(250, 120, 'x'), { pos: [wsX + 40, belt - 190, -(cabW / 2 - 320)], mat: 'peinture', color: 0x222222, layer: 'meca' });
+  const backX = P.rear === 'pickup' ? cR : xR + 300;
+  hab.part('Moquette de plancher', S.box(Math.max(400, wsX - backX - 100), 8, cabW - 60), { pos: [(wsX + backX) / 2, floorY - 20, 0], mat: 'tissu', color: 0x222428 });
   return car;
+}
+
+/** Panneau plat entre deux points du profil latéral (plan XY) */
+function panel(asm, name, A, B, width, thick, opts) {
+  const dx = B[0] - A[0], dy = B[1] - A[1];
+  const len = Math.hypot(dx, dy), ang = Math.atan2(dy, dx) * 180 / Math.PI;
+  return asm.part(name, S.box(len, thick, width), { ...opts, pos: [(A[0] + B[0]) / 2, (A[1] + B[1]) / 2 + thick / 2, 0], rot: [0, 0, ang] });
+}
+
+/** Pont / différentiel arrière (propulsion et 4×4) */
+function rearDiff(ax, P, XR, WY, track) {
+  const dy = P.leaf ? 0 : 40;
+  if (P.leaf) ax.part('Trompe de pont arrière', S.cyl(90, track - 200, 'z'), { pos: [XR, WY, 0], mat: 'acierHR', color: 0x1c1d20 });
+  ax.part('Carter de différentiel arrière', S.sphere(P.leaf ? 300 : 260), { pos: [XR, WY + dy, 0], mat: 'fonte' });
+  ax.part('Couvercle de différentiel', S.cyl(220, 30, 'x'), { pos: [XR - 140, WY + dy, 0], mat: 'fonte' });
+  boltCircle(ax, { n: 10, pcd: 190, d: 8, L: 25, axis: 'x', at: [XR - 155, WY + dy, 0], dir: -1, label: 'Vis de couvercle de différentiel', couple: 28 });
+  ax.part('Couronne de différentiel', S.cyl(210, 30, 'z'), { pos: [XR, WY + dy, -60], mat: 'acierHR' });
+  ax.part('Pignon d\'attaque', S.cyl(70, 140, 'x', 24, 40), { pos: [XR + 120, WY + dy, 0], mat: 'acierHR' });
+  ax.part('Bouchon de remplissage de pont', S.bolt(16, 14, 'x'), { pos: [XR - 160, WY + dy + 40, 60], rot: [0, 0, 90], mat: 'acier', couple: 40 });
+  for (const sd of SIDES) {
+    if (P.leaf) ax.part(`Arbre de roue ${sd.m}`, S.cyl(32, track / 2 - 150, 'z'), { pos: [XR, WY, sd.s * (track / 4)], mat: 'acierHR' });
+    else {
+      ax.part(`Arbre de transmission arrière ${sd.m}`, S.rod([XR, WY + dy, sd.s * 140], [XR, WY, sd.s * (track / 2 - 110)], 30), { mat: 'acierHR' });
+      ax.part(`Écrou de moyeu arrière ${sd.m}`, S.nut(22, 'z'), { pos: [XR, WY, sd.s * (track / 2 - 70)], mat: 'acierHR', couple: '330 N·m' });
+    }
+  }
 }

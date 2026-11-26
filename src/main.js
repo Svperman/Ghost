@@ -4,17 +4,11 @@ import { TransformControls } from 'three/examples/jsm/controls/TransformControls
 import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import './style.css';
-import { buildCar } from './vehicles/car.js';
-import { buildTruck } from './vehicles/truck.js';
-import { buildMoto } from './vehicles/moto.js';
-import { buildPlane } from './vehicles/plane.js';
+import { CATALOG, DEFAULT_TYPE } from './catalog.js';
+import { LAYERS } from './core/builder.js';
 
-const VEHICLES = {
-  avion: { build: buildPlane, label: 'Avion' },
-  voiture: { build: buildCar, label: 'Voiture' },
-  camion: { build: buildTruck, label: 'Camion' },
-  moto: { build: buildMoto, label: 'Moto' },
-};
+const LAYER_STEPS = ['Tout afficher', 'Sans carrosserie', 'Sans intérieur', 'Sans mécanique', 'Châssis seul'];
+const layerIndex = (id) => Math.max(0, LAYERS.findIndex((l) => l.id === id));
 
 // ============================================================================ Utilitaires
 const $ = (s) => document.querySelector(s);
@@ -73,15 +67,28 @@ const state = {
   key: null, root: null, rootNode: null, meshes: [], rowByNode: new Map(),
   selected: null, selectedMeshes: new Set(), hovered: null,
   xray: false, wire: false, dims: false, labels: false, measure: false,
-  explode: 0, expanded: new Set(), filter: '',
+  explode: 0, expanded: new Set(), filter: '', cat: null, type: null, peel: 0,
 };
 const explodeT = () => state.explode * 1.4;
 
 // ============================================================================ Chargement d'un véhicule
-function loadVehicle(key) {
-  if (!VEHICLES[key]) key = 'voiture';
+function parseHash() {
+  const [c, t] = location.hash.slice(1).split('/');
+  const cat = CATALOG[c] ? c : 'voiture';
+  const type = CATALOG[cat].types[t] ? t : DEFAULT_TYPE[cat];
+  return [cat, type];
+}
+function fillTypeSelect(cat, type) {
+  const sel = $('#type-select');
+  sel.innerHTML = Object.entries(CATALOG[cat].types).map(([k, t]) => `<option value="${k}" ${k === type ? 'selected' : ''}>${esc(t.label)}</option>`).join('');
+}
+function loadVehicle(cat, type) {
+  if (!CATALOG[cat]) cat = 'voiture';
+  if (!CATALOG[cat].types[type]) type = DEFAULT_TYPE[cat];
+  const key = `${cat}/${type}`;
   $('#loading').style.display = 'grid';
-  document.querySelectorAll('#vehicle-tabs button').forEach((b) => b.classList.toggle('active', b.dataset.v === key));
+  document.querySelectorAll('#vehicle-tabs button').forEach((b) => b.classList.toggle('active', b.dataset.v === cat));
+  fillTypeSelect(cat, type);
   requestAnimationFrame(() => setTimeout(() => {
     if (state.root) {
       gizmo.detach();
@@ -90,8 +97,8 @@ function loadVehicle(key) {
     }
     clearMeasure();
     const t0 = performance.now();
-    const asm = VEHICLES[key].build();
-    state.key = key;
+    const asm = CATALOG[cat].types[type].build();
+    state.key = key; state.cat = cat; state.type = type;
     state.root = asm.object;
     state.rootNode = asm.node;
     scene.add(state.root);
@@ -107,6 +114,7 @@ function loadVehicle(key) {
     $('#search').value = '';
     state.filter = '';
     buildTree();
+    applyLayers();
     renderDetails();
     refreshMaterials();
     updateLabels();
@@ -115,11 +123,13 @@ function loadVehicle(key) {
     const fast = parts.filter(isFastener).length;
     const box = new THREE.Box3().setFromObject(state.root);
     const sz = box.getSize(new THREE.Vector3());
+    renderVehicleCard(parts, fast);
     $('#stats').innerHTML = `<b>${parts.length}</b> pièces · <b>${fast}</b> fixations · hors-tout <b>${nf.format(Math.round(sz.x))} × ${nf.format(Math.round(sz.z))} × ${nf.format(Math.round(sz.y))}</b> mm`;
     setView('iso', false);
     $('#loading').style.display = 'none';
     console.info(`[Ghost] ${key} construit en ${Math.round(performance.now() - t0)} ms – ${parts.length} pièces`);
     if (location.hash.slice(1) !== key) history.replaceState(null, '', `#${key}`);
+    document.title = `${CATALOG[cat].types[type].label} – Ghost`;
   }, 10));
 }
 
@@ -245,6 +255,32 @@ function setView(v, animate = true) {
 }
 
 function isVisible(o) { for (let p = o; p; p = p.parent) if (!p.visible) return false; return true; }
+function refreshVis(o) { o.visible = !o.userData.userHidden && !o.userData.layerHidden; }
+function setUserHidden(o, h) { o.userData.userHidden = h; refreshVis(o); }
+
+// ============================================================================ Couches (extérieur → châssis)
+function applyLayers() {
+  if (!state.root) return;
+  for (const m of state.meshes) {
+    m.userData.layerHidden = layerIndex(m.userData.node.layer) < state.peel;
+    refreshVis(m);
+  }
+  $('#layer-label').textContent = LAYER_STEPS[state.peel];
+  $('#layers').value = state.peel;
+  if (state.filter) applyFilter(); else if (state.rootNode) renderTreeVisibility();
+  updateDimsOverlay();
+  updateLabels();
+}
+function setPeel(v) { state.peel = Math.max(0, Math.min(4, v)); applyLayers(); }
+
+function renderVehicleCard(parts, fast) {
+  const t = CATALOG[state.cat].types[state.type];
+  const per = LAYERS.map((l) => [l.label, parts.filter((p) => p.layer === l.id).length]);
+  $('#vehicle-card').innerHTML = `<h3>${esc(t.label)}</h3><p>${esc(t.desc || '')}</p>
+    <h4>Constructeurs de ce type (exemples)</h4><div class="makers">${(t.makers || []).map((m) => `<span>${esc(m)}</span>`).join('')}</div>
+    <h4>Couches – de l'extérieur au châssis</h4><div class="lay">${per.map(([l, n], i) => `<div><span>${i + 1}. ${esc(l)}</span><span>${n} pcs</span></div>`).join('')}</div>
+    <p style="margin-top:8px">${parts.length} pièces dont ${fast} fixations. Modèle générique représentatif du type – cotes typiques, pas les plans d'un modèle précis.</p>`;
+}
 
 // ============================================================================ Picking
 const raycaster = new THREE.Raycaster();
@@ -352,7 +388,7 @@ treeEl.addEventListener('click', (ev) => {
   const row = ev.target.closest('.row');
   if (!row) return;
   const n = row._node;
-  if (ev.target.classList.contains('eye')) { setNodeVisible(n, !n.object.visible); return; }
+  if (ev.target.classList.contains('eye')) { setNodeVisible(n, !!n.object.userData.userHidden); return; }
   if (ev.target.classList.contains('caret') && n.kind === 'group') {
     state.expanded.has(n) ? state.expanded.delete(n) : state.expanded.add(n);
     state.filter ? applyFilter() : renderTreeVisibility();
@@ -363,8 +399,8 @@ treeEl.addEventListener('click', (ev) => {
 });
 
 function setNodeVisible(n, v) {
-  n.object.visible = v;
-  if (v) for (let p = n.parent; p; p = p.parent) p.object.visible = true;
+  setUserHidden(n.object, !v);
+  if (v) for (let p = n.parent; p; p = p.parent) setUserHidden(p.object, false);
   renderTreeVisibility();
   updateDimsOverlay();
 }
@@ -423,7 +459,7 @@ function highlight(text, terms) {
 $('#btn-expand').onclick = () => { walk(state.rootNode, (n) => n.kind === 'group' && state.expanded.add(n)); renderTreeVisibility(); };
 $('#btn-collapse').onclick = () => { state.expanded = new Set([state.rootNode]); renderTreeVisibility(); };
 $('#btn-showall').onclick = showAll;
-function showAll() { state.root.traverse((o) => { if (o.userData.node) o.visible = true; }); renderTreeVisibility(); updateDimsOverlay(); }
+function showAll() { state.root.traverse((o) => { if (o.userData.node) setUserHidden(o, false); }); setPeel(0); }
 
 // ============================================================================ Panneau de détails
 function renderDetails() {
@@ -440,12 +476,12 @@ function renderDetails() {
   if (n.desc) html += `<p class="desc">${esc(n.desc)}</p>`;
   html += '<div class="actions">';
   html += '<button data-a="focus">🎯 Centrer (F)</button><button data-a="isolate">🔍 Isoler (I)</button>';
-  html += `<button data-a="hide">${n.object.visible ? '🙈 Masquer (H)' : '👁 Afficher (H)'}</button><button data-a="parent" ${n.parent ? '' : 'disabled'}>⬆ Ensemble parent</button>`;
+  html += `<button data-a="hide">${n.object.userData.userHidden ? '👁 Afficher (H)' : '🙈 Masquer (H)'}</button><button data-a="parent" ${n.parent ? '' : 'disabled'}>⬆ Ensemble parent</button>`;
   html += '<button data-a="move">✥ Déplacer (G)</button><button data-a="rotate">⟳ Pivoter (R)</button>';
   html += '<button data-a="reset">↺ Remettre en place</button><button data-a="copy">📋 Copier la fiche</button>';
   html += '</div><table class="kv">';
   if (n.kind === 'part') {
-    html += `<tr><th colspan="2">Caractéristiques</th></tr><tr><td>Matériau</td><td>${esc(n.material)}</td></tr>`;
+    html += `<tr><th colspan="2">Caractéristiques</th></tr><tr><td>Matériau</td><td>${esc(n.material)}</td></tr><tr><td>Couche</td><td>${esc(LAYERS[layerIndex(n.layer)].label)}</td></tr>`;
     if (n.norme) html += `<tr><td>Norme</td><td>${esc(n.norme)}</td></tr>`;
     if (n.couple != null) html += `<tr><td>Couple de serrage</td><td>${esc(typeof n.couple === 'number' ? `${n.couple} N·m` : n.couple)}</td></tr>`;
     const dims = Object.entries(n.dims || {});
@@ -485,13 +521,13 @@ function action(a) {
   switch (a) {
     case 'focus': frameObject(n.object); break;
     case 'isolate': {
-      state.root.traverse((o) => { if (o.userData.node) o.visible = false; });
-      n.object.traverse((o) => { if (o.userData.node) o.visible = true; });
-      for (let p = n.parent; p; p = p.parent) p.object.visible = true;
+      state.root.traverse((o) => { if (o.userData.node) setUserHidden(o, true); });
+      n.object.traverse((o) => { if (o.userData.node) { o.userData.layerHidden = false; setUserHidden(o, false); } });
+      for (let p = n.parent; p; p = p.parent) setUserHidden(p.object, false);
       renderTreeVisibility(); frameObject(n.object); updateDimsOverlay(); renderDetails();
       break;
     }
-    case 'hide': setNodeVisible(n, !n.object.visible); renderDetails(); break;
+    case 'hide': setNodeVisible(n, !!n.object.userData.userHidden); renderDetails(); break;
     case 'parent': if (n.parent) select(n.parent, { focus: true }); break;
     case 'move': gizmo.attach(n.object); gizmo.setMode('translate'); break;
     case 'rotate': gizmo.attach(n.object); gizmo.setMode('rotate'); break;
@@ -615,15 +651,15 @@ $('#b-shot').onclick = () => {
   renderer.render(scene, camera);
   const a = document.createElement('a');
   a.href = renderer.domElement.toDataURL('image/png');
-  a.download = `ghost-${state.key}${state.selected ? `-${state.selected.ref}` : ''}.png`;
+  a.download = `ghost-${state.key.replace('/', '-')}${state.selected ? `-${state.selected.ref}` : ''}.png`;
   a.click();
 };
 $('#b-csv').onclick = () => {
-  const rows = [['Chemin', 'Désignation', 'Référence', 'Type', 'Matériau', 'Norme', 'Couple de serrage', 'Cotes (mm)']];
+  const rows = [['Chemin', 'Désignation', 'Référence', 'Couche', 'Type', 'Matériau', 'Norme', 'Couple de serrage', 'Cotes (mm)']];
   walk(state.rootNode, (n) => {
     if (n.kind !== 'part') return;
     rows.push([
-      pathOf(n).slice(0, -1).map((p) => p.name).join(' > '), n.name, n.ref, n.type, n.material, n.norme || '',
+      pathOf(n).slice(0, -1).map((p) => p.name).join(' > '), n.name, n.ref, LAYERS[layerIndex(n.layer)].label, n.type, n.material, n.norme || '',
       n.couple == null ? '' : typeof n.couple === 'number' ? `${n.couple} N·m` : n.couple,
       Object.entries(n.dims).map(([k, v]) => `${k}=${typeof v === 'number' ? nf.format(v) : v}`).join(' ; '),
     ]);
@@ -631,12 +667,14 @@ $('#b-csv').onclick = () => {
   const csv = '﻿' + rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(';')).join('\r\n');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-  a.download = `nomenclature-${state.key}.csv`;
+  a.download = `nomenclature-${state.key.replace('/', '-')}.csv`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 };
-document.querySelectorAll('#vehicle-tabs button').forEach((b) => { b.onclick = () => loadVehicle(b.dataset.v); });
-window.addEventListener('hashchange', () => { const k = location.hash.slice(1); if (k !== state.key && VEHICLES[k]) loadVehicle(k); });
+document.querySelectorAll('#vehicle-tabs button').forEach((b) => { b.onclick = () => loadVehicle(b.dataset.v, DEFAULT_TYPE[b.dataset.v]); });
+$('#type-select').onchange = (e) => loadVehicle(state.cat, e.target.value);
+$('#layers').oninput = (e) => setPeel(+e.target.value);
+window.addEventListener('hashchange', () => { const [c, t] = parseHash(); if (`${c}/${t}` !== state.key) loadVehicle(c, t); });
 
 // Boutons mobiles
 const mobileBar = document.createElement('div');
@@ -648,7 +686,9 @@ $('#m-details').onclick = () => { document.body.classList.toggle('show-details')
 
 // Clavier
 window.addEventListener('keydown', (ev) => {
-  if (ev.target.tagName === 'INPUT') return;
+  if (ev.target.tagName === 'INPUT' || ev.target.tagName === 'SELECT') return;
+  if (ev.key === 'PageDown') { ev.preventDefault(); setPeel(state.peel + 1); return; }
+  if (ev.key === 'PageUp') { ev.preventDefault(); setPeel(state.peel - 1); return; }
   const k = ev.key.toLowerCase();
   if (k === 'escape') {
     if (!$('#help').hidden) { $('#help').hidden = true; return; }
@@ -704,4 +744,4 @@ function tick(now) {
 }
 requestAnimationFrame(tick);
 
-loadVehicle(location.hash.slice(1) || 'voiture');
+loadVehicle(...parseHash());

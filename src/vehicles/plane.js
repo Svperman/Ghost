@@ -3,27 +3,34 @@
 import { Assembly, S, SIDES, boltCircle, boltRow, axisRot, airfoil, wedge } from '../core/builder.js';
 import { wheel } from '../core/parts.js';
 
+export const PLANE_TYPES = {
+  monomoteur: {
+    label: 'Monomoteur léger à aile haute', desc: 'Avion école / tourisme 4 places',
+    makers: ['Cessna (172 Skyhawk)', 'Piper (PA-28 – aile basse)', 'Robin (DR400 – aile basse bois)', 'Diamond (DA40 – composite)', 'Cirrus (SR22 – parachute cellule)', 'Tecnam (P2010)'],
+  },
+};
+
 const WHITE = 0xf3f3f1, STRIPE = 0x1b3d7a;
 const FY = 1300; // axe du fuselage
 const WY = 2100; // emplanture de l'aile (intrados)
 const DIH = Math.tan(1.7 * Math.PI / 180);
 
 export function buildPlane() {
-  const av = new Assembly('Avion léger monomoteur', { prefix: 'AV', code: 'GEN', desc: 'Monomoteur 4 places aile haute – 8 280 × 11 000 × 2 720 mm – MTOW 1 157 kg' });
+  const av = new Assembly('Avion léger monomoteur', { prefix: 'AV', code: 'GEN', layer: 'meca', desc: 'Monomoteur 4 places aile haute – 8 280 × 11 000 × 2 720 mm – MTOW 1 157 kg' });
 
   // ------------------------------------------------------------------ Fuselage
-  const fu = av.group('Fuselage', { code: 'FUS' });
+  const fu = av.group('Fuselage', { code: 'FUS', layer: 'ext' });
   const prof = [[0, -5250], [90, -5150], [230, -4300], [380, -3200], [500, -2000], [570, -800], [585, 0], [570, 900], [540, 1500]];
   fu.part('Revêtement de fuselage', S.lathe(prof, 48, 1.22, 1), { pos: [0, FY, 0], mat: 'peintureAlu', color: WHITE, desc: 'Semi-monocoque – revêtement 2024-T3 ép. 0,63 à 0,81 mm' });
   fu.part('Bande décorative', S.lathe([[332, -3900], [474, -2400], [569, -1000], [588, 0], [576, 800]], 48, 1.22, 1.01), { pos: [0, FY, 0], scale: [1, 0.2, 1], mat: 'peintureAlu', color: STRIPE });
   for (let i = 0; i < 9; i++) {
     const x = -4600 + i * 560;
     const r = Math.min(580, 120 + (x + 5200) * 0.12);
-    fu.part(`Couple n°${i + 1}`, S.tube(r * 2, r * 2 - 50, 25, 'x', 40), { pos: [x, FY, 0], scale: [1, 1.22, 1], mat: 'alu2024' });
+    fu.part(`Couple n°${i + 1}`, S.tube(r * 2, r * 2 - 50, 25, 'x', 40), { pos: [x, FY, 0], scale: [1, 1.22, 1], mat: 'alu2024', layer: 'struct' });
   }
-  for (const sd of SIDES) for (const y of [-1, 1]) fu.part(`Lisse ${y > 0 ? 'supérieure' : 'inférieure'} ${sd.f}`, S.box(5200, 20, 20), { pos: [-2100, FY + y * 500, sd.s * 470], mat: 'alu2024' });
-  fu.part('Cloison pare-feu', S.box(25, 1250, 1100), { pos: [1450, FY, 0], mat: 'inox', desc: 'Acier inoxydable 0,4 mm' });
-  fu.part('Plancher cabine', S.box(2600, 15, 1050), { pos: [100, FY - 520, 0], mat: 'alu2024' });
+  for (const sd of SIDES) for (const y of [-1, 1]) fu.part(`Lisse ${y > 0 ? 'supérieure' : 'inférieure'} ${sd.f}`, S.box(5200, 20, 20), { pos: [-2100, FY + y * 500, sd.s * 470], mat: 'alu2024', layer: 'struct' });
+  fu.part('Cloison pare-feu', S.box(25, 1250, 1100), { pos: [1450, FY, 0], mat: 'inox', desc: 'Acier inoxydable 0,4 mm', layer: 'struct' });
+  fu.part('Plancher cabine', S.box(2600, 15, 1050), { pos: [100, FY - 520, 0], mat: 'alu2024', layer: 'struct' });
   fu.part('Carénage dorsal', S.extrude([[-1500, 1980], [-4000, 1700], [-4000, 1800], [-1500, 2080]], 220, 20), { mat: 'peintureAlu', color: WHITE });
   const vit = fu.group('Verrière & vitrages', { code: 'VIT' });
   vit.part('Pare-brise', S.box(820, 8, 1080), { pos: [1080, 1960, 0], rot: [0, 0, -42], mat: 'plexi', desc: 'PMMA étiré ép. 4,8 mm' });
@@ -40,7 +47,7 @@ export function buildPlane() {
     fu.part(`Marchepied ${sd.m}`, S.box(120, 15, 90), { pos: [-300, 650, sd.s * 700], mat: 'aluminium' });
     fu.part(`Jambe de marchepied ${sd.m}`, S.rod([-300, 650, sd.s * 700], [-300, 850, sd.s * 560], 20), { mat: 'acier' });
   }
-  const ant = fu.group('Antennes', { code: 'AVI' });
+  const ant = fu.group('Antennes', { code: 'AVI', layer: 'meca' });
   ant.part('Antenne VHF COM 1', S.rod([-1800, 2000, 0], [-2000, 2550, 0], 10), { mat: 'composite', color: 0x222222 });
   ant.part('Antenne VOR (moustaches)', S.rod([-4200, 2400, -350], [-4200, 2400, 350], 8), { mat: 'aluminium' });
   ant.part('Antenne transpondeur', S.cyl(10, 100, 'y'), { pos: [-1500, 640, 0], mat: 'laiton' });
@@ -49,7 +56,7 @@ export function buildPlane() {
   ant.part('Feu anticollision', S.ellipsoid(80, 40, 80), { pos: [-4900, 2780, 0], mat: 'feuRouge' });
 
   // ------------------------------------------------------------------ Voilure
-  const vo = av.group('Voilure', { code: 'AIL' });
+  const vo = av.group('Voilure', { code: 'AIL', layer: 'ext' });
   const prf = airfoil(0.12, 0.02, 0.4, 20);
   const c = (z) => (Math.abs(z) < 2500 ? 1630 : 1630 - (Math.abs(z) - 2500) * (510 / 2900));
   const ly = (z) => WY + (Math.abs(z) - 550) * DIH;
@@ -57,13 +64,13 @@ export function buildPlane() {
     const aile = vo.group(`Aile ${sd.f}`, { code: `AI${sd.c}` });
     const zs = [550, 2500, 5400].map((z) => z * sd.s);
     aile.part('Caisson d\'aile', S.loft(zs.map((z) => ({ x: 600 - (1630 - c(z)) * 0.3, y: ly(z), z, chord: c(z) * 0.76, tScale: 1 / 0.76 })), prf, 'z'), { mat: 'peintureAlu', color: WHITE, desc: 'Profil NACA 2412 – dièdre 1,7° – vrillage 3°' });
-    aile.part('Longeron principal', S.box(30, 150, 4800), { pos: [190, ly(2950) + 28, sd.s * 2950], rot: [-sd.s * 1.7, 0, 0], mat: 'alu2024' });
-    aile.part('Longeron arrière', S.box(25, 60, 4800), { pos: [-330, ly(2950) + 25, sd.s * 2950], rot: [-sd.s * 1.7, 0, 0], mat: 'alu2024' });
+    aile.part('Longeron principal', S.box(30, 150, 4800), { pos: [190, ly(2950) + 28, sd.s * 2950], rot: [-sd.s * 1.7, 0, 0], mat: 'alu2024', layer: 'struct' });
+    aile.part('Longeron arrière', S.box(25, 60, 4800), { pos: [-330, ly(2950) + 25, sd.s * 2950], rot: [-sd.s * 1.7, 0, 0], mat: 'alu2024', layer: 'struct' });
     for (let k = 0; k < 10; k++) {
       const z = sd.s * (700 + k * 500);
-      aile.part(`Nervure ${k + 1}`, S.loft([{ x: 600 - (1630 - c(z)) * 0.3, y: ly(z), z: z - 4, chord: c(z) * 0.75, tScale: 1 / 0.76 * 0.97 }, { x: 600 - (1630 - c(z)) * 0.3, y: ly(z), z: z + 4, chord: c(z) * 0.75, tScale: 1 / 0.76 * 0.97 }], prf, 'z'), { mat: 'alu2024' });
+      aile.part(`Nervure ${k + 1}`, S.loft([{ x: 600 - (1630 - c(z)) * 0.3, y: ly(z), z: z - 4, chord: c(z) * 0.75, tScale: 1 / 0.76 * 0.97 }, { x: 600 - (1630 - c(z)) * 0.3, y: ly(z), z: z + 4, chord: c(z) * 0.75, tScale: 1 / 0.76 * 0.97 }], prf, 'z'), { mat: 'alu2024', layer: 'struct' });
     }
-    aile.part('Réservoir structural 106 L', S.box(480, 90, 1500), { pos: [290, ly(1800) + 30, sd.s * 1800], rot: [-sd.s * 1.7, 0, 0], mat: 'alu2024', desc: '106 L dont 102 L utilisables – AVGAS 100LL' });
+    aile.part('Réservoir structural 106 L', S.box(480, 90, 1500), { pos: [290, ly(1800) + 30, sd.s * 1800], rot: [-sd.s * 1.7, 0, 0], mat: 'alu2024', desc: '106 L dont 102 L utilisables – AVGAS 100LL', layer: 'meca' });
     aile.part('Bouchon de réservoir', S.cyl(70, 20, 'y'), { pos: [250, ly(1800) + 150, sd.s * 1800], mat: 'aluminium' });
     aile.part('Purge de réservoir', S.cyl(15, 30, 'y'), { pos: [100, ly(1100) - 15, sd.s * 1100], mat: 'laiton' });
     aile.part('Saumon d\'aile', S.ellipsoid(c(5400) * 0.8, 130, 220), { pos: [600 - (1630 - c(5400)) * 0.3 - c(5400) * 0.4 + c(5400) * 0.4 * 0.24, ly(5400) + 25, sd.s * 5470], mat: 'composite', color: WHITE });
@@ -118,7 +125,7 @@ export function buildPlane() {
   }
 
   // ------------------------------------------------------------------ Empennages
-  const em = av.group('Empennages', { code: 'EMP' });
+  const em = av.group('Empennages', { code: 'EMP', layer: 'ext' });
   const sym = airfoil(0.09, 0, 0.4, 16);
   const hz = em.group('Empennage horizontal', { code: 'EMP' });
   for (const sd of SIDES) {
@@ -140,7 +147,7 @@ export function buildPlane() {
   }
 
   // ------------------------------------------------------------------ Groupe motopropulseur
-  const gmp = av.group('Groupe motopropulseur', { code: 'GMP' });
+  const gmp = av.group('Groupe motopropulseur', { code: 'GMP', layer: 'meca' });
   const mo = gmp.group('Moteur 4 cylindres à plat 5,9 L', { code: 'MOT', desc: '361 in³ (5 916 cm³) – 4 cylindres opposés refroidis par air – 120 kW à 2 700 tr/min' });
   const EX = 2050;
   mo.part('Carter moteur', S.box(620, 330, 360), { pos: [EX, FY, 0], mat: 'aluminium', color: 0x5a5f66 });
@@ -178,14 +185,14 @@ export function buildPlane() {
   mo.part('Jauge à huile', S.cyl(20, 250, 'y'), { pos: [EX - 300, FY + 220, 150], mat: 'acier' });
   mo.part('Pompe à vide', S.cyl(90, 100, 'x'), { pos: [EX - 380, FY - 80, 0], mat: 'aluminium' });
   mo.part('Filtre à huile', S.cyl(90, 140, 'x'), { pos: [EX - 380, FY - 150, -150], mat: 'peinture', color: 0xd4a017 });
-  const bm = gmp.group('Bâti moteur', { code: 'BAT' });
+  const bm = gmp.group('Bâti moteur', { code: 'BAT', layer: 'struct' });
   for (const sd of SIDES) for (const y of [-1, 1]) {
     bm.part(`Tube de bâti ${y > 0 ? 'supérieur' : 'inférieur'} ${sd.m}`, S.rod([1470, FY + y * 450, sd.s * 450], [EX - 250, FY + y * 160, sd.s * 220], 25), { mat: 'acier', color: 0x2a5530 });
     bm.part(`Silent-bloc de bâti ${y > 0 ? 'sup.' : 'inf.'} ${sd.m}`, S.cyl(80, 60, 'x'), { pos: [EX - 260, FY + y * 160, sd.s * 220], mat: 'caoutchouc' });
     bm.part(`Boulon de bâti ${y > 0 ? 'sup.' : 'inf.'} ${sd.m} AN8`, S.bolt(12, 110, 'x'), { pos: [EX - 200, FY + y * 160, sd.s * 220], mat: 'acierHR', couple: 50 });
     bm.part(`Boulon de bâti sur cloison ${y > 0 ? 'sup.' : 'inf.'} ${sd.m}`, S.bolt(10, 50, 'x'), { pos: [1500, FY + y * 450, sd.s * 450], mat: 'acierHR', couple: 18 });
   }
-  const cap = gmp.group('Capotage moteur', { code: 'CAP' });
+  const cap = gmp.group('Capotage moteur', { code: 'CAP', layer: 'ext' });
   cap.part('Capot supérieur', S.lathe([[560, 1460], [560, 1800], [520, 2300], [430, 2700]], 40, 1.05, 1.02), { pos: [0, FY + 20, 0], scale: [1, 1, 1], mat: 'peintureAlu', color: WHITE });
   cap.part('Entrée d\'air gauche', S.ellipsoid(60, 160, 260), { pos: [2690, FY + 160, -230], mat: 'composite', color: 0x111111 });
   cap.part('Entrée d\'air droite', S.ellipsoid(60, 160, 260), { pos: [2690, FY + 160, 230], mat: 'composite', color: 0x111111 });
@@ -206,7 +213,7 @@ export function buildPlane() {
   boltCircle(he, { n: 6, pcd: 120, d: 10, L: 140, axis: 'x', at: [PX + 110, FY + 20, 0], dir: 1, label: 'Boulon d\'hélice', kind: 'bolt', couple: '75 N·m (freinage fil)' });
 
   // ------------------------------------------------------------------ Atterrisseurs
-  const tr = av.group('Atterrisseurs', { code: 'ATT' });
+  const tr = av.group('Atterrisseurs', { code: 'ATT', layer: 'sol' });
   for (const sd of SIDES) {
     const tp = tr.group(`Train principal ${sd.m}`, { code: 'ATT' });
     tp.part('Lame de train en acier à ressort', S.rod([-150, 720, sd.s * 250], [-300, 230, sd.s * 1180], 70), { mat: 'acierHR', color: WHITE, desc: 'Lame d\'acier 6150 – voie 2 300 mm' });
@@ -229,7 +236,7 @@ export function buildPlane() {
   ta.part('Axe de roue avant', S.cyl(20, 180, 'z'), { pos: [2120, 175, 0], mat: 'acierHR' });
 
   // ------------------------------------------------------------------ Cabine
-  const ck = av.group('Cabine & commandes de vol', { code: 'CKP' });
+  const ck = av.group('Cabine & commandes de vol', { code: 'CKP', layer: 'int' });
   const pb = ck.group('Tableau de bord', { code: 'PDB' });
   pb.part('Planche de bord', S.box(40, 420, 1080), { pos: [1080, 1450, 0], rot: [0, 0, -5], mat: 'abs', color: 0x2c2e33 });
   pb.part('Auvent de tableau de bord', S.box(250, 20, 1080), { pos: [1000, 1670, 0], mat: 'abs', color: 0x1a1b1e });

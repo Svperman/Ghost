@@ -10,11 +10,12 @@
   <header id="topbar">
     <div class="brand"><span class="logo">◎</span> GHOST <small>Explorateur 3D de pièces</small></div>
     <nav id="vehicle-tabs" aria-label="Véhicules">
-      <button data-v="avion">✈️ <span>Avion</span></button>
-      <button data-v="voiture">🚗 <span>Voiture</span></button>
-      <button data-v="camion">🚚 <span>Camion</span></button>
-      <button data-v="moto">🏍️ <span>Moto</span></button>
+      <button data-v="avion">✈️ <span>Aéronefs</span></button>
+      <button data-v="voiture">🚗 <span>Voitures</span></button>
+      <button data-v="camion">🚚 <span>Camions</span></button>
+      <button data-v="moto">🏍️ <span>Motos</span></button>
     </nav>
+    <select id="type-select" aria-label="Type de véhicule"></select>
     <div id="stats"></div>
   </header>
 
@@ -36,6 +37,9 @@
     <div id="tooltip"></div>
     <div id="measure-hint"></div>
     <div id="toolbar">
+      <label class="slider" title="Retirer les couches, de l'extérieur jusqu'au châssis (PgUp / PgDn)">🧅 <span id="layer-label">Tout</span>
+        <input id="layers" type="range" min="0" max="4" value="0" step="1" />
+      </label>
       <label class="slider" title="Vue éclatée (E)">💥 Éclatement
         <input id="explode" type="range" min="0" max="100" value="0" />
       </label>
@@ -58,6 +62,7 @@
 
   <aside id="details">
     <div id="details-empty">
+      <div id="vehicle-card"></div>
       <h2>Aucune pièce sélectionnée</h2>
       <p>Cliquez sur une pièce dans la vue 3D ou dans l'arborescence.</p>
       <ul class="tips">
@@ -83,10 +88,11 @@
         <tr><td>G / R</td><td>Déplacer / pivoter la pièce (poignées 3D)</td></tr>
         <tr><td>I / H</td><td>Isoler / masquer la sélection</td></tr>
         <tr><td>E</td><td>Basculer la vue éclatée</td></tr>
+        <tr><td>Page ↓ / Page ↑</td><td>Retirer / remettre une couche (carrosserie → intérieur → mécanique → trains → châssis)</td></tr>
         <tr><td>X / W / C / L / M</td><td>Rayons X / filaire / cotes / étiquettes / mesure</td></tr>
         <tr><td>Échap</td><td>Désélectionner / quitter le mode</td></tr>
       </table>
-      <p class="note">Les modèles sont des représentations génériques construites à partir de cotes typiques (normes ISO pour la visserie). Ils ne reproduisent pas les plans d'un constructeur particulier.</p>
+      <p class="note">Les modèles sont des représentations génériques construites à partir de cotes typiques (normes ISO pour la visserie). Ils ne reproduisent pas les plans d'un constructeur particulier : les constructeurs cités pour chaque type sont des exemples de fabricants de ce type de véhicule. Les logos et marques déposées ne sont pas reproduits.</p>
       <button id="help-close">Fermer</button>
     </div>
   </div>

@@ -246,9 +246,10 @@ export const S = {
     const P = profile;
     const vert = (s, px, py) => {
       const tw = (s.twist || 0) * DEG;
-      let x = (px - 0.25) * s.chord, y = py * s.chord * (s.tScale ?? 1);
+      // le bord d'attaque est en s.x, la corde s'étend vers l'arrière (−X)
+      let x = -(px - 0.25) * s.chord, y = py * s.chord * (s.tScale ?? 1);
       const cx = x * Math.cos(tw) - y * Math.sin(tw), cy = x * Math.sin(tw) + y * Math.cos(tw);
-      x = cx + 0.25 * s.chord;
+      x = cx - 0.25 * s.chord;
       if (span === 'z') return [s.x + x, s.y + cy, s.z];
       if (span === 'y') return [s.x + x, s.y, s.z + cy];
       return [s.x, s.y + cy, s.z + x]; // span x
@@ -319,13 +320,14 @@ export class Assembly {
     this.node = {
       kind: 'group', name, ref: opts.ref || `${this.root.prefix}-${this.code}`,
       desc: opts.desc || '', children: [], object: this.object, parent: parent ? parent.node : null,
+      layer: opts.layer || (parent ? parent.node.layer : 'meca'),
     };
     this.object.userData.node = this.node;
     applyTransform(this.object, opts);
   }
 
   group(name, opts = {}) {
-    const a = new Assembly(name, { code: opts.code || this.code, ...opts }, this, this.root);
+    const a = new Assembly(name, { ...opts, code: opts.code || this.code }, this, this.root);
     this.object.add(a.object);
     this.node.children.push(a.node);
     return a;
@@ -349,6 +351,7 @@ export class Assembly {
       norme: opts.norme || (shape.kind === 'vis' ? 'ISO 4017 / ISO 4762' : shape.kind === 'écrou' ? 'ISO 4032' : shape.kind === 'rondelle' ? 'ISO 7089' : ''),
       couple: opts.couple || null, // couple de serrage (N·m)
       object: mesh, parent: this.node, children: [],
+      layer: opts.layer || this.node.layer,
     };
     mesh.userData.node = node;
     this.object.add(mesh);
@@ -362,6 +365,15 @@ function applyTransform(obj, o) {
   if (o.rot) obj.rotation.set(o.rot[0] * DEG, o.rot[1] * DEG, o.rot[2] * DEG);
   if (o.scale) obj.scale.set(...(Array.isArray(o.scale) ? o.scale : [o.scale, o.scale, o.scale]));
 }
+
+/** Couches d'épluchage, de l'extérieur vers le châssis */
+export const LAYERS = [
+  { id: 'ext', label: 'Carrosserie / revêtement' },
+  { id: 'int', label: 'Intérieur / habitacle' },
+  { id: 'meca', label: 'Mécanique & équipements' },
+  { id: 'sol', label: 'Trains roulants & roues' },
+  { id: 'struct', label: 'Châssis / structure' },
+];
 
 // ---------------------------------------------------------------------------
 // Aides : côtés gauche / droit, cercles de boulons

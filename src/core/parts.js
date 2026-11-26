@@ -43,7 +43,7 @@ export function wheel(asm, name, side, o) {
     const a = (i / nSp) * 360 + 90;
     const L = rimD / 2 - (o.pcd ? o.pcd / 2 + 15 : rimD * 0.17);
     const r0 = (o.pcd ? o.pcd / 2 + 15 : rimD * 0.17) + L / 2;
-    g.part(`Jante – branche ${i + 1}`, S.box(L, o.spokeW || 34, 12), {
+    g.part(`${o.spokeLabel || 'Jante – branche'} ${i + 1}`, S.box(L, o.spokeW || 34, 12), {
       pos: [Math.cos(a * Math.PI / 180) * r0, Math.sin(a * Math.PI / 180) * r0, faceZ], rot: [0, 0, a], mat: rimMat,
     });
   }

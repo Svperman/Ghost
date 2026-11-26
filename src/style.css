@@ -113,3 +113,17 @@ table.kv td:last-child { text-align: right; font-variant-numeric: tabular-nums; 
 }
 #mobile-bar { display: none; gap: 6px; }
 @media (max-width: 800px) { #mobile-bar { display: flex; margin-left: auto; } }
+
+#type-select { font: inherit; color: var(--text); background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; max-width: 260px; }
+#type-select:focus { outline: none; border-color: var(--accent); }
+#layer-label { display: inline-block; min-width: 118px; }
+#vehicle-card { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin-bottom: 16px; }
+#vehicle-card h3 { margin: 0 0 4px; font-size: 15px; }
+#vehicle-card p { margin: 4px 0 8px; font-size: 12.5px; color: var(--muted); }
+#vehicle-card .makers { display: flex; flex-wrap: wrap; gap: 4px; }
+#vehicle-card .makers span { font-size: 11.5px; padding: 2px 8px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); }
+#vehicle-card .lay { margin-top: 10px; font-size: 12px; }
+#vehicle-card .lay div { display: flex; justify-content: space-between; padding: 2px 0; border-bottom: 1px solid rgba(42,48,57,.5); }
+#vehicle-card .lay div span:last-child { color: var(--muted); font-variant-numeric: tabular-nums; }
+#vehicle-card h4 { margin: 10px 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+@media (max-width: 800px) { #type-select { max-width: 150px; } #layer-label { min-width: 0; } }
