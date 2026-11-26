@@ -6,6 +6,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import './style.css';
 import { CATALOG, DEFAULT_TYPE } from './catalog.js';
 import { LAYERS } from './core/builder.js';
+import { readModelFile, gltfToAssembly } from './core/importer.js';
 
 const LAYER_STEPS = ['Tout afficher', 'Sans carrosserie', 'Sans intérieur', 'Sans mécanique', 'Châssis seul'];
 const layerIndex = (id) => Math.max(0, LAYERS.findIndex((l) => l.id === id));
@@ -75,16 +76,28 @@ const explodeT = () => state.explode * 1.4;
 function parseHash() {
   const [c, t] = location.hash.slice(1).split('/');
   const cat = CATALOG[c] ? c : 'voiture';
-  const type = CATALOG[cat].types[t] ? t : DEFAULT_TYPE[cat];
+  const type = CATALOG[cat].types[t] ? t : firstType(cat);
   return [cat, type];
 }
 function fillTypeSelect(cat, type) {
   const sel = $('#type-select');
   sel.innerHTML = Object.entries(CATALOG[cat].types).map(([k, t]) => `<option value="${k}" ${k === type ? 'selected' : ''}>${esc(t.label)}</option>`).join('');
 }
+const firstType = (cat) => DEFAULT_TYPE[cat] || Object.keys(CATALOG[cat].types)[0];
+function renderTabs() {
+  const nav = $('#vehicle-tabs');
+  nav.innerHTML = Object.entries(CATALOG)
+    .filter(([, c]) => !c.hidden || Object.keys(c.types).length)
+    .map(([k, c]) => `<button data-v="${k}" title="${esc(c.label)}">${c.icon} <span>${esc(c.label)}</span></button>`).join('');
+  nav.querySelectorAll('button').forEach((b) => {
+    b.onclick = () => loadVehicle(b.dataset.v, firstType(b.dataset.v));
+    b.classList.toggle('active', b.dataset.v === state.cat);
+  });
+}
+renderTabs();
 function loadVehicle(cat, type) {
-  if (!CATALOG[cat]) cat = 'voiture';
-  if (!CATALOG[cat].types[type]) type = DEFAULT_TYPE[cat];
+  if (!CATALOG[cat] || !Object.keys(CATALOG[cat].types).length) cat = 'voiture';
+  if (!CATALOG[cat].types[type]) type = firstType(cat);
   const key = `${cat}/${type}`;
   $('#loading').style.display = 'grid';
   document.querySelectorAll('#vehicle-tabs button').forEach((b) => b.classList.toggle('active', b.dataset.v === cat));
@@ -113,6 +126,7 @@ function loadVehicle(cat, type) {
     state.rootNode.children.forEach((c) => c.kind === 'group' && state.expanded.add(c));
     $('#search').value = '';
     state.filter = '';
+    if (state.peel) state.peel = 0; // on repart du véhicule complet
     buildTree();
     applyLayers();
     renderDetails();
@@ -218,14 +232,30 @@ function select(node, { focus = false, fromTree = false } = {}) {
   if (focus && node) frameObject(node.object);
 }
 
+/** Distance caméra pour que la boîte tienne entièrement dans le champ (largeur et hauteur) */
+function fitDistance(box, dir, margin = 1.12) {
+  const c = box.getCenter(new THREE.Vector3());
+  const fwd = dir.clone().negate().normalize();
+  const up0 = Math.abs(fwd.y) > 0.98 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
+  const right = new THREE.Vector3().crossVectors(fwd, up0).normalize();
+  const up = new THREE.Vector3().crossVectors(right, fwd).normalize();
+  const tanV = Math.tan((camera.fov * Math.PI) / 360), tanH = tanV * camera.aspect;
+  let d = 0;
+  const p = new THREE.Vector3();
+  for (let i = 0; i < 8; i++) {
+    p.set(i & 1 ? box.max.x : box.min.x, i & 2 ? box.max.y : box.min.y, i & 4 ? box.max.z : box.min.z).sub(c);
+    const depth = p.dot(fwd);
+    d = Math.max(d, Math.abs(p.dot(right)) / tanH - depth, Math.abs(p.dot(up)) / tanV - depth);
+  }
+  return Math.max(d * margin, 200);
+}
 function frameObject(obj, animate = true) {
   const box = new THREE.Box3();
   obj.traverse((o) => { if (o.isMesh && isVisible(o)) box.expandByObject(o); });
   if (box.isEmpty()) box.setFromObject(obj);
   const c = box.getCenter(new THREE.Vector3());
-  const r = Math.max(box.getSize(new THREE.Vector3()).length() / 2, 60);
-  const dist = r / Math.sin((camera.fov * Math.PI) / 360) * 1.6;
   const dir = camera.position.clone().sub(controls.target).normalize();
+  const dist = Math.max(fitDistance(box, dir, 1.35), 150);
   animateCamera(c, c.clone().addScaledVector(dir, dist), animate);
 }
 
@@ -247,11 +277,11 @@ function setView(v, animate = true) {
   if (!state.root) return;
   const box = new THREE.Box3().setFromObject(state.root);
   const c = box.getCenter(new THREE.Vector3());
-  const r = box.getSize(new THREE.Vector3()).length() / 2;
-  const d = r / Math.sin((camera.fov * Math.PI) / 360) * 0.95;
   const dirs = { iso: [1, 0.55, 1.1], front: [1, 0.08, 0], side: [0, 0.08, -1], top: [0.0001, 1, 0] };
   const dir = new THREE.Vector3(...dirs[v]).normalize();
-  animateCamera(c, c.clone().addScaledVector(dir, d), animate);
+  // marge supplémentaire : la barre d'outils masque le bas de la vue
+  const d = fitDistance(box, dir, 1.18);
+  animateCamera(c.clone().add(new THREE.Vector3(0, box.getSize(new THREE.Vector3()).y * 0.08, 0)), c.clone().addScaledVector(dir, d), animate);
 }
 
 function isVisible(o) { for (let p = o; p; p = p.parent) if (!p.visible) return false; return true; }
@@ -275,6 +305,22 @@ function setPeel(v) { state.peel = Math.max(0, Math.min(4, v)); applyLayers(); }
 
 function renderVehicleCard(parts, fast) {
   const t = CATALOG[state.cat].types[state.type];
+  if (t.imported) {
+    $('#vehicle-card').innerHTML = `<h3>${esc(t.label)}</h3><p>${esc(t.desc)}</p>
+      <p class="warn">Modèle importé : pièces = maillages du fichier. Dimensions = encombrements mesurés, pas des cotes de plan.</p>
+      <h4>Réglages d'import</h4>
+      <div class="imp-tools">
+        <button data-imp="rot" title="Faire pivoter de 90° autour de l'axe vertical">↻ Pivoter 90°</button>
+        <select data-imp="unit" title="Unité du fichier (glTF = mètres)">${[[1000, 'Unité : mètre'], [10, 'Unité : centimètre'], [1, 'Unité : millimètre'], [25.4, 'Unité : pouce']].map(([u, l]) => `<option value="${u}" ${+t.opts.unit === u ? 'selected' : ''}>${l}</option>`).join('')}</select>
+        <button data-imp="del" title="Retirer ce modèle de la liste">🗑 Retirer</button>
+      </div>
+      <h4>Couches (devinées d'après les noms)</h4><div class="lay">${LAYERS.map((l, i) => `<div><span>${i + 1}. ${esc(l.label)}</span><span>${parts.filter((p) => p.layer === l.id).length} pcs</span></div>`).join('')}</div>
+      <p style="margin-top:8px">${parts.length} pièces · ${nf.format(t.tris)} triangles.</p>`;
+    $('#vehicle-card [data-imp="rot"]').onclick = () => { t.opts.rotY = (t.opts.rotY + 90) % 360; loadVehicle('import', state.type); };
+    $('#vehicle-card [data-imp="unit"]').onchange = (e) => { t.opts.unit = +e.target.value; loadVehicle('import', state.type); };
+    $('#vehicle-card [data-imp="del"]').onclick = () => { delete CATALOG.import.types[state.type]; renderTabs(); loadVehicle(...(Object.keys(CATALOG.import.types).length ? ['import', firstType('import')] : ['voiture', 'berline'])); };
+    return;
+  }
   const per = LAYERS.map((l) => [l.label, parts.filter((p) => p.layer === l.id).length]);
   $('#vehicle-card').innerHTML = `<h3>${esc(t.label)}</h3><p>${esc(t.desc || '')}</p>
     <h4>Constructeurs de ce type (exemples)</h4><div class="makers">${(t.makers || []).map((m) => `<span>${esc(m)}</span>`).join('')}</div>
@@ -486,7 +532,7 @@ function renderDetails() {
     if (n.couple != null) html += `<tr><td>Couple de serrage</td><td>${esc(typeof n.couple === 'number' ? `${n.couple} N·m` : n.couple)}</td></tr>`;
     const dims = Object.entries(n.dims || {});
     if (dims.length) {
-      html += '<tr><th colspan="2">Cotes nominales</th></tr>';
+      html += `<tr><th colspan="2">${n.type === 'pièce importée' ? 'Dimensions mesurées sur le maillage' : 'Cotes nominales'}</th></tr>`;
       for (const [k, v] of dims) html += `<tr><td>${esc(k)}</td><td>${typeof v === 'number' ? (k === 'Spires' ? nf.format(v) : mm(v)) : esc(v)}</td></tr>`;
     }
   } else {
@@ -671,7 +717,6 @@ $('#b-csv').onclick = () => {
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 };
-document.querySelectorAll('#vehicle-tabs button').forEach((b) => { b.onclick = () => loadVehicle(b.dataset.v, DEFAULT_TYPE[b.dataset.v]); });
 $('#type-select').onchange = (e) => loadVehicle(state.cat, e.target.value);
 $('#layers').oninput = (e) => setPeel(+e.target.value);
 window.addEventListener('hashchange', () => { const [c, t] = parseHash(); if (`${c}/${t}` !== state.key) loadVehicle(c, t); });
@@ -743,5 +788,46 @@ function tick(now) {
   labelRenderer.render(scene, camera);
 }
 requestAnimationFrame(tick);
+
+// ============================================================================ Import de modèles .glb
+let importSeq = 0;
+async function importFile(file) {
+  if (!file) return;
+  if (!/\.(glb|gltf)$/i.test(file.name)) { alert('Format non pris en charge : choisissez un fichier .glb (ou .gltf autonome).'); return; }
+  $('#loading').textContent = `Lecture de « ${file.name} »…`;
+  $('#loading').style.display = 'grid';
+  try {
+    const res = await readModelFile(file);
+    const id = `m${++importSeq}`;
+    const label = file.name.replace(/\.(glb|gltf)$/i, '');
+    const t = {
+      label, imported: true, tris: res.tris, opts: { unit: 1000, rotY: 90 },
+      desc: `Fichier ${file.name} – ${(file.size / 1048576).toFixed(1).replace('.', ',')} Mo – ${res.meshes} maillage(s)${res.animations ? ` – ${res.animations} animation(s) ignorée(s)` : ''}`,
+      makers: [],
+    };
+    t.build = () => gltfToAssembly(res.scene, { name: label, unit: t.opts.unit, rotY: t.opts.rotY });
+    CATALOG.import.types[id] = t;
+    renderTabs();
+    loadVehicle('import', id);
+  } catch (err) {
+    console.error(err);
+    $('#loading').style.display = 'none';
+    alert(`Impossible de lire ce fichier : ${err.message || err}\n\nUn .gltf qui référence des fichiers externes (.bin, textures) doit d'abord être converti en .glb.`);
+  } finally {
+    $('#loading').textContent = 'Construction du modèle…';
+  }
+}
+$('#b-import').onclick = () => $('#file-import').click();
+$('#file-import').onchange = (e) => { importFile(e.target.files[0]); e.target.value = ''; };
+let dragDepth = 0;
+window.addEventListener('dragenter', (e) => { if ([...(e.dataTransfer?.types || [])].includes('Files')) { dragDepth++; document.body.classList.add('dragging'); } });
+window.addEventListener('dragleave', () => { dragDepth = Math.max(0, dragDepth - 1); if (!dragDepth) document.body.classList.remove('dragging'); });
+window.addEventListener('dragover', (e) => e.preventDefault());
+window.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dragDepth = 0;
+  document.body.classList.remove('dragging');
+  importFile(e.dataTransfer?.files?.[0]);
+});
 
 loadVehicle(...parseHash());

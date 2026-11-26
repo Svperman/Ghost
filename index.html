@@ -9,12 +9,7 @@
 <body>
   <header id="topbar">
     <div class="brand"><span class="logo">◎</span> GHOST <small>Explorateur 3D de pièces</small></div>
-    <nav id="vehicle-tabs" aria-label="Véhicules">
-      <button data-v="avion">✈️ <span>Aéronefs</span></button>
-      <button data-v="voiture">🚗 <span>Voitures</span></button>
-      <button data-v="camion">🚚 <span>Camions</span></button>
-      <button data-v="moto">🏍️ <span>Motos</span></button>
-    </nav>
+    <nav id="vehicle-tabs" aria-label="Véhicules"></nav>
     <select id="type-select" aria-label="Type de véhicule"></select>
     <div id="stats"></div>
   </header>
@@ -34,6 +29,7 @@
 
   <main id="viewport">
     <div id="loading">Construction du modèle…</div>
+    <div id="drop-hint">Déposez votre fichier .glb ici</div>
     <div id="tooltip"></div>
     <div id="measure-hint"></div>
     <div id="toolbar">
@@ -54,6 +50,8 @@
       <button id="v-side" title="Vue de côté">Côté</button>
       <button id="v-top" title="Vue de dessus">Dessus</button>
       <span class="sep"></span>
+      <button id="b-import" title="Importer un modèle 3D réel (.glb / .gltf) – ou glissez-déposez le fichier dans la vue">📦 Importer</button>
+      <input id="file-import" type="file" accept=".glb,.gltf,model/gltf-binary,model/gltf+json" hidden />
       <button id="b-shot" title="Capture d'écran PNG">📷</button>
       <button id="b-csv" title="Exporter la nomenclature (CSV)">📄 Nomenclature</button>
       <button id="b-help" title="Aide (?)">?</button>
@@ -91,7 +89,9 @@
         <tr><td>Page ↓ / Page ↑</td><td>Retirer / remettre une couche (carrosserie → intérieur → mécanique → trains → châssis)</td></tr>
         <tr><td>X / W / C / L / M</td><td>Rayons X / filaire / cotes / étiquettes / mesure</td></tr>
         <tr><td>Échap</td><td>Désélectionner / quitter le mode</td></tr>
+        <tr><td>📦 Importer .glb</td><td>Charger un modèle 3D réel (glTF binaire), ou le glisser-déposer dans la vue</td></tr>
       </table>
+      <p class="note">Modèles importés : chaque maillage du fichier devient une pièce sélectionnable. Les dimensions affichées sont mesurées sur le maillage (encombrement) : ce ne sont pas des cotes de plan, et la visserie n'existe que si le modèle la contient. Le fichier reste dans votre navigateur, il n'est envoyé nulle part.</p>
       <p class="note">Les modèles sont des représentations génériques construites à partir de cotes typiques (normes ISO pour la visserie). Ils ne reproduisent pas les plans d'un constructeur particulier : les constructeurs cités pour chaque type sont des exemples de fabricants de ce type de véhicule. Les logos et marques déposées ne sont pas reproduits.</p>
       <button id="help-close">Fermer</button>
     </div>

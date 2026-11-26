@@ -5,14 +5,21 @@ chaque pièce, vis, écrou, rondelle ou rivet est un objet 3D **nommé**, avec s
 son matériau, sa norme et son couple de serrage. On peut le sélectionner, le chercher par son nom, le déplacer,
 le pivoter, l'isoler, et retirer les couches du véhicule **de l'extérieur jusqu'au châssis**.
 
-## Catalogue (20 types, ≈ 11 000 pièces)
+## Catalogue (43 types, ≈ 20 000 pièces)
 
 | Catégorie | Types |
 |---|---|
 | ✈️ Aéronefs | Monomoteur léger à aile haute · Avion de ligne biréacteur · Jet d'affaires · Hélicoptère monoturbine |
 | 🚗 Voitures | Citadine · Berline · Break · SUV 4×4 · Monospace 7 places · Coupé sportif · Pick-up double cabine · Électrique |
+| 🚐 Utilitaires | Fourgonnette · Fourgon L2H2 · Grand fourgon L4H3 propulsion à roues jumelées |
 | 🚚 Camions | Tracteur routier 4×2 · Tracteur 6×2 · Porteur benne 8×4 · Porteur fourgon 4×2 |
-| 🏍️ Motos | Roadster · Sportive carénée · Trail / aventure · Custom / cruiser |
+| 🚌 Bus & cars | Bus urbain 12 m · Bus urbain électrique · Autocar de tourisme · Minibus / scolaire |
+| 🚜 Agricole | Tracteur standard 4RM · Tracteur vigneron / fruitier |
+| 🏍️ Motos & quads | Roadster · Sportive carénée · Trail · Custom · Scooter 125 · Scooter électrique · Quad 4×4 |
+| 🚲 Vélos | Vélo de ville · VTT tout suspendu · Vélo de route · Vélo à assistance électrique |
+| ⛵ Bateaux | Semi-rigide 6,5 m · Voilier de croisière 9,5 m · Vedette à moteur 8 m |
+| 🚆 Ferroviaire | Locomotive électrique BB · Voiture voyageurs · Wagon-citerne · Tramway à plancher bas |
+| 📦 Importés | Vos propres modèles 3D au format `.glb` (voir ci-dessous) |
 
 Chaque type indique des **constructeurs qui fabriquent ce type de véhicule** (exemples : Renault, Airbus, Volvo, Yamaha…).
 
@@ -47,6 +54,18 @@ Chaque type indique des **constructeurs qui fabriquent ce type de véhicule** (e
 | / | Aller à la recherche |
 | Échap | Désélectionner |
 
+## Importer un modèle 3D réel (.glb)
+
+Bouton **📦 Importer** (ou glisser-déposer le fichier dans la vue). Formats : glTF binaire `.glb`, ou `.gltf` autonome ;
+la compression Draco et Meshopt est prise en charge. Le fichier reste dans le navigateur, il n'est envoyé nulle part.
+
+- Chaque maillage du fichier devient une **pièce** sélectionnable ; les nœuds nommés deviennent des **ensembles**.
+- Les dimensions affichées sont **mesurées sur le maillage** (encombrement), pas des cotes de plan.
+- La **couche** (carrosserie, intérieur, mécanique, roues, châssis) est devinée d'après le nom des pièces et des matériaux.
+- Réglages dans la fiche : **↻ Pivoter 90°** (orientation) et **unité** du fichier (mètre par défaut, comme le veut le glTF).
+
+Des modèles gratuits ou payants se trouvent par exemple sur Sketchfab (format « glTF » à l'export) – vérifiez la licence de chaque modèle.
+
 ## Lancer le projet
 
 Prérequis : [Node.js](https://nodejs.org) 18 ou plus récent.
@@ -54,7 +73,7 @@ Prérequis : [Node.js](https://nodejs.org) 18 ou plus récent.
 ```bash
 git clone https://github.com/svperman/ghost.git
 cd ghost
-git checkout claude/serene-volta-9rghhp
+git checkout claude/lucid-cori-h8ur1d
 npm install
 npm run dev        # puis ouvrir http://localhost:5173
 ```
