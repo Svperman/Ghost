@@ -25,11 +25,23 @@ function pathOf(node) { const p = []; for (let n = node; n; n = n.parent) p.unsh
 
 // ============================================================================ Scène
 const viewport = $('#viewport');
-const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, logarithmicDepthBuffer: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+// Téléphones et tablettes : rendu allégé (moins de pixels, pas d'anticrénelage matériel) pour éviter
+// que le navigateur ne ferme la page faute de mémoire, et pour limiter la chauffe.
+const LITE = window.matchMedia('(pointer: coarse)').matches || Math.min(screen.width, screen.height) < 820;
+const renderer = new THREE.WebGLRenderer({ antialias: !LITE, alpha: true, logarithmicDepthBuffer: true, powerPreference: LITE ? 'low-power' : 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, LITE ? 1.25 : 2));
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
 viewport.prepend(renderer.domElement);
+// Si le navigateur retire la 3D (mémoire saturée), on propose de recharger au lieu d'un écran noir
+renderer.domElement.addEventListener('webglcontextlost', (e) => {
+  e.preventDefault();
+  const box = document.createElement('div');
+  box.id = 'gl-lost';
+  box.innerHTML = '<p>L\'affichage 3D s\'est arrêté : l\'appareil manquait de mémoire.</p><button type="button">Recharger</button><small>Astuce : les petits véhicules (vélos, motos, voitures) sont plus légers que les camions et les autocars.</small>';
+  box.querySelector('button').onclick = () => location.reload();
+  viewport.appendChild(box);
+});
 renderer.domElement.setAttribute('role', 'img');
 renderer.domElement.setAttribute('aria-label', 'Vue 3D du véhicule : faites glisser pour tourner, molette pour zoomer, clic pour sélectionner une pièce');
 
@@ -742,6 +754,8 @@ const mobileBar = document.createElement('div');
 mobileBar.id = 'mobile-bar';
 mobileBar.innerHTML = '<button id="m-tree">☰ Pièces</button><button id="m-details">ℹ Fiche</button>';
 $('#topbar').appendChild(mobileBar);
+// La vue 3D commence juste sous l'en-tête, quelle que soit sa hauteur réelle (téléphone : plusieurs lignes)
+new ResizeObserver(() => document.documentElement.style.setProperty('--top-h', `${$('#topbar').offsetHeight}px`)).observe($('#topbar'));
 $('#m-tree').onclick = () => { document.body.classList.toggle('show-tree'); document.body.classList.remove('show-details'); };
 $('#m-details').onclick = () => { document.body.classList.toggle('show-details'); document.body.classList.remove('show-tree'); };
 
@@ -783,8 +797,19 @@ new ResizeObserver(resize).observe(viewport);
 resize();
 
 const tmpV = new THREE.Vector3();
+// Rendu à la demande en mode allégé : on dessine tant qu'il y a une interaction ou une animation,
+// puis on s'arrête quand la vue est immobile (économie de batterie et de chaleur).
+let activeFrames = 120;
+const wake = () => { activeFrames = 90; };
+for (const ev of ['pointerdown', 'pointermove', 'wheel', 'keydown', 'click', 'input', 'change', 'touchstart', 'touchmove', 'resize']) window.addEventListener(ev, wake, { passive: true });
+controls.addEventListener('change', wake);
 function tick(now) {
   requestAnimationFrame(tick);
+  if (LITE) {
+    if (explodeAnim || camAnim || !$('#loading').style.display.includes('none')) activeFrames = Math.max(activeFrames, 30);
+    if (activeFrames <= 0) return;
+    activeFrames--;
+  }
   if (explodeAnim) {
     let k = Math.min(1, (now - explodeAnim.t0) / 600);
     k = 1 - (1 - k) ** 3;
