@@ -781,6 +781,7 @@ $('#m-details').onclick = () => { document.body.classList.toggle('show-details')
 // ============================================================================ Animation de fonctionnement
 // Le générateur peut fournir root.userData.animate(angle) ; sinon, on fait tourner roues, hélices et rotors.
 const anim = { on: false, deg: 0, speed: 1, last: 0, fn: null, phases: null };
+if (import.meta.env.DEV) window.__ghost = { state, anim, setAnimOn };
 function setupAnimation() {
   if (anim.on) setAnimOn(false);
   anim.deg = 0;
@@ -796,19 +797,23 @@ function genericAnimator(root) {
   root.updateMatrixWorld(true);
   const box = new THREE.Box3();
   const add = (o, axis, k, pivot) => items.push({ o, axis, k, pivot });
+  const centerIn = (obj, parent) => parent.worldToLocal(box.setFromObject(obj).getCenter(new THREE.Vector3()));
   root.traverse((o) => {
     const n = o.name || '';
-    if (o.isGroup && /^Roue\b|^Roues\b/i.test(n)) add(o, new THREE.Vector3(0, 0, -1), 1, new THREE.Vector3());
+    // Roue = groupe qui contient directement un pneumatique (ou essieu ferroviaire, ou crampons de pneu).
+    // Elle tourne sur SON axe (centre du groupe), et non autour du centre du véhicule.
+    const isWheel = o.isGroup && (o.children.some((c) => c.isMesh && c.name === 'Pneumatique') || /^Barrettes de pneu|^Crampons de pneu/.test(n));
+    if (isWheel) add(o, new THREE.Vector3(0, 0, -1), 1, o.userData.base.pos.clone());
+    // Essieu ferroviaire : seuls l'axe, les roues et les disques tournent (boîtes d'essieu, ressorts et moteur restent fixes)
+    else if (o.isMesh && /^(Corps d'essieu|Roue monobloc|Disque de frein)/.test(n) && /^Essieu monté/.test(o.parent?.name || '')) add(o, new THREE.Vector3(0, 0, -1), 1, new THREE.Vector3());
     else if (o.isGroup && /^Hélice|^Rotor principal/i.test(n)) {
       const hub = o.children.find((c) => /Moyeu|Cône/.test(c.name)) || o;
-      const c = box.setFromObject(hub).getCenter(new THREE.Vector3());
-      o.parent.worldToLocal(c);
-      add(o, /^Rotor principal/.test(n) ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0), /^Rotor/.test(n) ? 0.6 : 2.5, c);
+      add(o, /^Rotor principal/.test(n) ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0), /^Rotor/.test(n) ? 0.6 : 2.5, centerIn(hub, o.parent));
     } else if (o.isMesh && /^(Aube de soufflante|Disque de soufflante|Cône d'entrée|Pale anticouple|Moyeu rotor anticouple)/.test(n)) {
       const anti = /anticouple/.test(n);
-      const pivot = anti ? box.setFromObject(o.parent.children.find((c) => /Moyeu rotor anticouple/.test(c.name)) || o).getCenter(new THREE.Vector3()) : null;
-      if (pivot) o.parent.worldToLocal(pivot);
-      add(o, anti ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(1, 0, 0), anti ? 3 : 2, pivot || new THREE.Vector3(o.userData.base.pos.x, 0, 0));
+      // Axe de rotation : centre du moyeu (rotor anticouple) ou du disque de soufflante voisin
+      const ref = o.parent.children.find((c) => (anti ? /Moyeu rotor anticouple/ : /Disque de soufflante|Cône d'entrée/).test(c.name)) || o;
+      add(o, anti ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(1, 0, 0), anti ? 3 : 2, centerIn(ref, o.parent));
     }
   });
   if (!items.length) return null;

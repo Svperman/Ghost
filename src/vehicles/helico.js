@@ -65,13 +65,13 @@ export function buildHelico() {
     }
     // pale le long de l'axe X local, puis tournée autour de Y
     const g = S.loft(secs.map((s) => ({ x: s.r, y: 0, z: 175, chord: 350 })), airfoil(0.12), 'x');
-    bl.part('Pale composite', g, { pos: [MX, MY + 100, 0], rot: [0, -a * 180 / Math.PI, 0], mat: 'composite', color: 0x2a2c30, desc: 'Profil OA2 – corde 350 mm – vrillage −12°' });
-    bl.part('Bord d\'attaque (bande titane)', S.box(4900, 10, 20), { pos: [MX + ca * 2900, MY + 108, -sa * 2900 + ca * 0], rot: [0, -a * 180 / Math.PI, 0], mat: 'titane' });
-    bl.part('Manchon de pale', S.cyl(150, 500, 'x'), { pos: [MX + ca * 450, MY + 100, -sa * 450], rot: [0, -a * 180 / Math.PI, 0], mat: 'aluminium' });
+    bl.part('Pale composite', g, { pos: [MX, MY + 100, 0], rot: [0, a * 180 / Math.PI, 0], mat: 'composite', color: 0x2a2c30, desc: 'Profil OA2 – corde 350 mm – vrillage −12°' });
+    bl.part('Bord d\'attaque (bande titane)', S.box(4900, 10, 20), { pos: [MX + ca * 2900, MY + 108, -sa * 2900 + ca * 0], rot: [0, a * 180 / Math.PI, 0], mat: 'titane' });
+    bl.part('Manchon de pale', S.cyl(150, 500, 'x'), { pos: [MX + ca * 450, MY + 100, -sa * 450], rot: [0, a * 180 / Math.PI, 0], mat: 'aluminium' });
     bl.part('Bielle de commande de pas', S.rod([MX + ca * 250 - sa * 120, MY - 330, -sa * 250 - ca * 120], [MX + ca * 400 - sa * 150, MY + 70, -sa * 400 - ca * 150], 25), { mat: 'acierHR' });
     bl.part('Butée sphérique élastomère', S.sphere(160), { pos: [MX + ca * 300, MY + 90, -sa * 300], mat: 'caoutchouc' });
     for (const k of [1, 2]) bl.part(`Boulon d'attache de pale ${k}`, S.bolt(16, 120, 'y'), { pos: [MX + ca * (580 + k * 70), MY + 170, -sa * (580 + k * 70)], mat: 'acierHR', couple: 120 });
-    bl.part('Saumon de pale', S.box(250, 30, 350), { pos: [MX + ca * 5400, MY + 100, -sa * 5400], rot: [0, -a * 180 / Math.PI, 0], mat: 'composite', color: [0xc0262d, 0x1f4fbf, 0xd4a017][b] });
+    bl.part('Saumon de pale', S.box(250, 30, 350), { pos: [MX + ca * 5400, MY + 100, -sa * 5400], rot: [0, a * 180 / Math.PI, 0], mat: 'composite', color: [0xc0262d, 0x1f4fbf, 0xd4a017][b] });
   }
 
   // ------------------------------------------------------------------ Motorisation & transmission
