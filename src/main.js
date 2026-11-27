@@ -9,6 +9,8 @@ import { CATALOG, DEFAULT_TYPE } from './catalog.js';
 import { LAYERS } from './core/builder.js';
 
 const LAYER_STEPS = ['Tout afficher', 'Sans carrosserie', 'Sans intérieur', 'Sans mécanique', 'Châssis seul'];
+const peelSteps = () => CATALOG[state.cat]?.peelSteps || LAYER_STEPS;
+const layerLabel = (i) => CATALOG[state.cat]?.layerLabels?.[i] || LAYERS[i].label;
 const layerIndex = (id) => Math.max(0, LAYERS.findIndex((l) => l.id === id));
 
 // ============================================================================ Utilitaires
@@ -61,7 +63,7 @@ sun.position.set(0.6, 1, 0.4);
 scene.add(sun, new THREE.HemisphereLight(0xdde6ff, 0x30281e, LITE ? 1.7 : 0.6));
 if (LITE) scene.add(new THREE.AmbientLight(0xffffff, 0.35));
 
-const camera = new THREE.PerspectiveCamera(40, 1, 5, 200000);
+const camera = new THREE.PerspectiveCamera(40, 1, LITE ? 5 : 0.1, 200000);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.12;
@@ -151,8 +153,10 @@ function loadVehicle(cat, type) {
     // Téléphone : sans reflets d'environnement, les métaux paraîtraient noirs ; on les rend plus mats
     if (LITE) for (const m of state.meshes) { m.material.metalness = Math.min(m.material.metalness, 0.25); m.material.roughness = Math.max(m.material.roughness, 0.45); }
     prepareExplode(state.root);
+    setupAnimation();
     applyExplode();
     setupGround();
+    setupCut();
     state.selected = null;
     state.selectedMeshes.clear();
     state.expanded = new Set([state.rootNode]);
@@ -224,6 +228,8 @@ function applyExplode() {
     if (!b) return;
     o.position.copy(b.pos).addScaledVector(b.explode, t).add(o.userData.user);
     if (o.userData.disOff) o.position.add(o.userData.disOff);
+    const a = o.userData.anim;
+    if (a) { o.position.add(a.pos); o.quaternion.copy(b.quat).premultiply(a.quat); o.scale.set(1, a.sy ?? 1, 1); }
   });
   updateDimsOverlay();
 }
@@ -243,6 +249,7 @@ function refreshMaterials() {
     if (state.xray && state.selectedMeshes.size && !sel) { mat.transparent = true; mat.opacity = 0.08; mat.depthWrite = false; }
     else if (state.xray && !state.selectedMeshes.size) { mat.transparent = true; mat.opacity = Math.min(b.opacity, 0.35); mat.depthWrite = false; }
     mat.wireframe = state.wire;
+    mat.clippingPlanes = cut.on ? [cut.plane] : null;
     mat.needsUpdate = true;
   }
 }
@@ -289,7 +296,7 @@ function frameObject(obj, animate = true) {
   if (box.isEmpty()) box.setFromObject(obj);
   const c = box.getCenter(new THREE.Vector3());
   const dir = camera.position.clone().sub(controls.target).normalize();
-  const dist = Math.max(fitDistance(box, dir, 1.35), 150);
+  const dist = Math.max(fitDistance(box, dir, 1.35), 30);
   animateCamera(c, c.clone().addScaledVector(dir, dist), animate);
 }
 
@@ -329,7 +336,7 @@ function applyLayers() {
     m.userData.layerHidden = layerIndex(m.userData.node.layer) < state.peel;
     refreshVis(m);
   }
-  $('#layer-label').textContent = LAYER_STEPS[state.peel];
+  $('#layer-label').textContent = peelSteps()[state.peel];
   $('#layers').value = state.peel;
   if (state.filter) applyFilter(); else if (state.rootNode) renderTreeVisibility();
   updateDimsOverlay();
@@ -355,7 +362,7 @@ function renderVehicleCard(parts, fast) {
     $('#vehicle-card [data-imp="del"]').onclick = () => { delete CATALOG.import.types[state.type]; renderTabs(); loadVehicle(...(Object.keys(CATALOG.import.types).length ? ['import', firstType('import')] : ['voiture', 'berline'])); };
     return;
   }
-  const per = LAYERS.map((l) => [l.label, parts.filter((p) => p.layer === l.id).length]);
+  const per = LAYERS.map((l, i) => [layerLabel(i), parts.filter((p) => p.layer === l.id).length]);
   $('#vehicle-card').innerHTML = `<h3>${esc(t.label)}</h3><p>${esc(t.desc || '')}</p>
     <h4>Constructeurs de ce type (exemples)</h4><div class="makers">${(t.makers || []).map((m) => `<span>${esc(m)}</span>`).join('')}</div>
     <h4>Couches – de l'extérieur au châssis</h4><div class="lay">${per.map(([l, n], i) => `<div><span>${i + 1}. ${esc(l)}</span><span>${n} pcs</span></div>`).join('')}</div>
@@ -369,7 +376,7 @@ function hitsAt(ev) {
   const r = renderer.domElement.getBoundingClientRect();
   ndc.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
   raycaster.setFromCamera(ndc, camera);
-  const hits = raycaster.intersectObjects(state.meshes, false).filter((h) => isVisible(h.object));
+  const hits = raycaster.intersectObjects(state.meshes, false).filter((h) => isVisible(h.object) && (!cut.on || cut.plane.distanceToPoint(h.point) >= 0));
   const seen = new Set();
   return hits.filter((h) => !seen.has(h.object) && seen.add(h.object));
 }
@@ -561,7 +568,7 @@ function renderDetails() {
   html += '<button data-a="reset">↺ Remettre en place</button><button data-a="copy">📋 Copier la fiche</button>';
   html += '</div><table class="kv">';
   if (n.kind === 'part') {
-    html += `<tr><th colspan="2">Caractéristiques</th></tr><tr><td>Matériau</td><td>${esc(n.material)}</td></tr><tr><td>Couche</td><td>${esc(LAYERS[layerIndex(n.layer)].label)}</td></tr>`;
+    html += `<tr><th colspan="2">Caractéristiques</th></tr><tr><td>Matériau</td><td>${esc(n.material)}</td></tr><tr><td>Couche</td><td>${esc(layerLabel(layerIndex(n.layer)))}</td></tr>`;
     if (n.norme) html += `<tr><td>Norme</td><td>${esc(n.norme)}</td></tr>`;
     if (n.couple != null) html += `<tr><td>Couple de serrage</td><td>${esc(typeof n.couple === 'number' ? `${n.couple} N·m` : n.couple)}</td></tr>`;
     const dims = Object.entries(n.dims || {});
@@ -612,7 +619,7 @@ function action(a) {
     case 'move': gizmo.attach(n.object); gizmo.setMode('translate'); break;
     case 'rotate': gizmo.attach(n.object); gizmo.setMode('rotate'); break;
     case 'reset': {
-      n.object.traverse((o) => { if (o.userData.base) { o.userData.user.set(0, 0, 0); o.quaternion.copy(o.userData.base.quat); } });
+      n.object.traverse((o) => { if (o.userData.base) { o.userData.user.set(0, 0, 0); delete o.userData.anim; o.quaternion.copy(o.userData.base.quat); o.scale.set(1, 1, 1); } });
       applyExplode(); renderDetails();
       break;
     }
@@ -714,6 +721,12 @@ function toggle(name, v = !state[name]) {
   }
 }
 ['xray', 'wire', 'dims', 'labels', 'measure'].forEach((k) => { $(`#t-${k}`).onclick = () => toggle(k); });
+$('#t-anim').onclick = () => setAnimOn(!anim.on);
+$('#anim-speed').onchange = (e) => { anim.speed = +e.target.value; };
+$('#t-cut').onclick = () => setCutOn(!cut.on);
+document.querySelectorAll('#cut-panel [data-axis]').forEach((b) => { b.onclick = () => { cut.axis = b.dataset.axis; setupCut(); }; });
+$('#cut-pos').oninput = (e) => { cut.pos = +e.target.value; updateCut(); };
+$('#cut-flip').onclick = () => { cut.flip = !cut.flip; updateCut(); };
 const explodeEl = $('#explode');
 explodeEl.oninput = () => { state.explode = explodeEl.value / 100; applyExplode(); };
 let explodeAnim = null;
@@ -739,7 +752,7 @@ $('#b-csv').onclick = () => {
   walk(state.rootNode, (n) => {
     if (n.kind !== 'part') return;
     rows.push([
-      pathOf(n).slice(0, -1).map((p) => p.name).join(' > '), n.name, n.ref, LAYERS[layerIndex(n.layer)].label, n.type, n.material, n.norme || '',
+      pathOf(n).slice(0, -1).map((p) => p.name).join(' > '), n.name, n.ref, layerLabel(layerIndex(n.layer)), n.type, n.material, n.norme || '',
       n.couple == null ? '' : typeof n.couple === 'number' ? `${n.couple} N·m` : n.couple,
       Object.entries(n.dims).map(([k, v]) => `${k}=${typeof v === 'number' ? nf.format(v) : v}`).join(' ; '),
     ]);
@@ -765,6 +778,113 @@ new ResizeObserver(() => document.documentElement.style.setProperty('--top-h', `
 $('#m-tree').onclick = () => { document.body.classList.toggle('show-tree'); document.body.classList.remove('show-details'); };
 $('#m-details').onclick = () => { document.body.classList.toggle('show-details'); document.body.classList.remove('show-tree'); };
 
+// ============================================================================ Animation de fonctionnement
+// Le générateur peut fournir root.userData.animate(angle) ; sinon, on fait tourner roues, hélices et rotors.
+const anim = { on: false, deg: 0, speed: 1, last: 0, fn: null, phases: null };
+function setupAnimation() {
+  if (anim.on) setAnimOn(false);
+  anim.deg = 0;
+  const ud = state.root.userData;
+  if (ud.animate) { anim.fn = ud.animate; anim.phases = ud.phases || null; anim.info = ud.animInfo || ''; }
+  else anim.fn = genericAnimator(state.root);
+  if (!ud.animate) { anim.phases = null; anim.info = anim.fn ? 'Roues, hélices, rotors et soufflantes en rotation.' : ''; }
+  $('#t-anim').hidden = !anim.fn;
+  $('#anim-speed').hidden = !anim.fn;
+}
+function genericAnimator(root) {
+  const items = [];
+  root.updateMatrixWorld(true);
+  const box = new THREE.Box3();
+  const add = (o, axis, k, pivot) => items.push({ o, axis, k, pivot });
+  root.traverse((o) => {
+    const n = o.name || '';
+    if (o.isGroup && /^Roue\b|^Roues\b/i.test(n)) add(o, new THREE.Vector3(0, 0, -1), 1, new THREE.Vector3());
+    else if (o.isGroup && /^Hélice|^Rotor principal/i.test(n)) {
+      const hub = o.children.find((c) => /Moyeu|Cône/.test(c.name)) || o;
+      const c = box.setFromObject(hub).getCenter(new THREE.Vector3());
+      o.parent.worldToLocal(c);
+      add(o, /^Rotor principal/.test(n) ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0), /^Rotor/.test(n) ? 0.6 : 2.5, c);
+    } else if (o.isMesh && /^(Aube de soufflante|Disque de soufflante|Cône d'entrée|Pale anticouple|Moyeu rotor anticouple)/.test(n)) {
+      const anti = /anticouple/.test(n);
+      const pivot = anti ? box.setFromObject(o.parent.children.find((c) => /Moyeu rotor anticouple/.test(c.name)) || o).getCenter(new THREE.Vector3()) : null;
+      if (pivot) o.parent.worldToLocal(pivot);
+      add(o, anti ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(1, 0, 0), anti ? 3 : 2, pivot || new THREE.Vector3(o.userData.base.pos.x, 0, 0));
+    }
+  });
+  if (!items.length) return null;
+  return (deg) => {
+    for (const it of items) {
+      const R = new THREE.Quaternion().setFromAxisAngle(it.axis, deg * it.k * Math.PI / 180);
+      const p0 = it.o.userData.base.pos;
+      it.o.userData.anim = { pos: it.pivot.clone().add(p0.clone().sub(it.pivot).applyQuaternion(R)).sub(p0), quat: R };
+    }
+  };
+}
+function setAnimOn(v) {
+  if (v && !anim.fn) return;
+  anim.on = v;
+  $('#t-anim').classList.toggle('on', v);
+  $('#t-anim').textContent = v ? '⏸ Pause' : '▶ Fonctionnement';
+  $('#anim-hud').hidden = !v;
+  if (v) { anim.last = performance.now(); }
+  else if (!v && state.root) {
+    // on garde la pose courante (pas de retour brutal) ; le bouton « Remettre en place » réinitialise
+  }
+}
+function stepAnimation(now) {
+  if (!anim.on || !anim.fn || !state.root) return;
+  const dt = Math.min(0.1, (now - anim.last) / 1000);
+  anim.last = now;
+  anim.deg = (anim.deg + dt * 120 * anim.speed) % 1440;
+  anim.fn(anim.deg);
+  applyExplode();
+  const hud = $('#anim-hud');
+  let html = `<b>${state.root.userData.animTitle ? state.root.userData.animTitle(anim.deg) : 'Fonctionnement'}</b><div class="info">${esc(anim.info)}</div>`;
+  if (anim.phases) html += '<div class="ph">' + anim.phases(anim.deg).map((p) => `<span style="border-color:${p.color}"><i style="background:${p.color}"></i>${esc(p.label)} · ${esc(p.value)}</span>`).join('') + '</div>';
+  hud.innerHTML = html;
+}
+
+// ============================================================================ Coupe (plan de section)
+const cut = { on: false, axis: 'z', pos: 0, flip: false, plane: new THREE.Plane(), min: 0, max: 0, helper: null };
+renderer.localClippingEnabled = true;
+function setupCut() {
+  if (!state.root) return;
+  const box = new THREE.Box3().setFromObject(state.root);
+  const i = { x: 0, y: 1, z: 2 }[cut.axis];
+  cut.min = Math.floor(box.min.getComponent(i)); cut.max = Math.ceil(box.max.getComponent(i));
+  cut.pos = Math.round(cut.axis === 'y' ? (cut.min + cut.max) / 2 : Math.max(cut.min, Math.min(cut.max, 0)));
+  const el = $('#cut-pos');
+  el.min = cut.min; el.max = cut.max; el.step = 1; el.value = cut.pos;
+  document.querySelectorAll('#cut-panel [data-axis]').forEach((b) => b.classList.toggle('on', b.dataset.axis === cut.axis));
+  if (cut.helper) { helpers.remove(cut.helper); cut.helper.geometry.dispose(); }
+  const sz = box.getSize(new THREE.Vector3()).multiplyScalar(1.1), c = box.getCenter(new THREE.Vector3());
+  const dims = cut.axis === 'x' ? [sz.z, sz.y] : cut.axis === 'y' ? [sz.x, sz.z] : [sz.x, sz.y];
+  cut.helper = new THREE.Mesh(new THREE.PlaneGeometry(...dims), new THREE.MeshBasicMaterial({ color: 0xffb020, transparent: true, opacity: 0.07, side: THREE.DoubleSide, depthWrite: false }));
+  if (cut.axis === 'x') cut.helper.rotation.y = Math.PI / 2;
+  if (cut.axis === 'y') cut.helper.rotation.x = -Math.PI / 2;
+  cut.center = c;
+  helpers.add(cut.helper);
+  updateCut();
+}
+function updateCut() {
+  const n = new THREE.Vector3(...{ x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] }[cut.axis]).multiplyScalar(cut.flip ? 1 : -1);
+  cut.plane.set(n, cut.flip ? -cut.pos : cut.pos);
+  if (cut.helper) {
+    cut.helper.visible = cut.on;
+    cut.helper.position.copy(cut.center);
+    cut.helper.position[cut.axis] = cut.pos;
+  }
+  $('#cut-val').textContent = `${cut.axis.toUpperCase()} = ${nf.format(cut.pos)} mm`;
+  $('#cut-pos').value = cut.pos;
+}
+function setCutOn(v) {
+  cut.on = v;
+  $('#t-cut').classList.toggle('on', v);
+  $('#cut-panel').hidden = !v;
+  updateCut();
+  refreshMaterials();
+}
+
 // Clavier
 window.addEventListener('keydown', (ev) => {
   if (ev.target.tagName === 'INPUT' || ev.target.tagName === 'SELECT') return;
@@ -788,6 +908,8 @@ window.addEventListener('keydown', (ev) => {
   else if (k === 'm') toggle('measure');
   else if (k === 'e') animateExplode(state.explode > 0.01 ? 0 : 0.6);
   else if (k === 'd') dis.on ? stopDisassembly() : startDisassembly();
+  else if (k === 'p') setAnimOn(!anim.on);
+  else if (k === 'k') setCutOn(!cut.on);
   else if (dis.on && (ev.key === 'ArrowRight' || ev.key === ' ')) { ev.preventDefault(); disStep(1); }
   else if (dis.on && ev.key === 'ArrowLeft') { ev.preventDefault(); disStep(-1); }
   else if (k === '/' ) { ev.preventDefault(); searchEl.focus(); }
@@ -962,7 +1084,7 @@ controls.addEventListener('change', wake);
 function tick(now) {
   requestAnimationFrame(tick);
   if (LITE) {
-    if (explodeAnim || camAnim || disAnim || !$('#loading').style.display.includes('none')) activeFrames = Math.max(activeFrames, 30);
+    if (explodeAnim || camAnim || disAnim || anim.on || !$('#loading').style.display.includes('none')) activeFrames = Math.max(activeFrames, 30);
     if (activeFrames <= 0) return;
     activeFrames--;
   }
@@ -976,10 +1098,11 @@ function tick(now) {
   }
   stepCamAnim(now);
   stepDisAnim(now);
+  stepAnimation(now);
   controls.update();
   if (LITE) {
     // Sans tampon de profondeur logarithmique : plan proche ajusté à la distance pour éviter les scintillements
-    const near = Math.max(1, camera.position.distanceTo(controls.target) / 300);
+    const near = Math.max(0.2, camera.position.distanceTo(controls.target) / 300);
     if (Math.abs(near - camera.near) / camera.near > 0.15) { camera.near = near; camera.updateProjectionMatrix(); }
   }
   processHover();

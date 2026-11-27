@@ -58,6 +58,14 @@
     <div id="tooltip"></div>
     <div id="measure-hint"></div>
     <section id="dis-panel" hidden aria-live="polite" aria-label="Démontage pas à pas"></section>
+    <div id="anim-hud" hidden></div>
+    <div id="cut-panel" hidden>
+      <b>✂️ Coupe</b>
+      <button data-axis="x">X</button><button data-axis="y">Y</button><button data-axis="z">Z</button>
+      <input id="cut-pos" type="range" />
+      <span id="cut-val"></span>
+      <button id="cut-flip" title="Garder l'autre moitié">⇄ Inverser</button>
+    </div>
     <div id="toolbar">
       <label class="slider" title="Retirer les couches, de l'extérieur jusqu'au châssis (PgUp / PgDn)">🧅 <span id="layer-label">Tout</span>
         <input id="layers" type="range" min="0" max="4" value="0" step="1" />
@@ -65,6 +73,9 @@
       <label class="slider" title="Vue éclatée (E)">💥 Éclatement
         <input id="explode" type="range" min="0" max="100" value="0" />
       </label>
+      <button class="toggle" id="t-anim" title="Animer le fonctionnement des pièces (P)">▶ Fonctionnement</button>
+      <select id="anim-speed" title="Vitesse de l'animation"><option value="0.25">Très lent</option><option value="1" selected>Lent</option><option value="3">Rapide</option></select>
+      <button class="toggle" id="t-cut" title="Coupe : trancher le modèle pour voir l'intérieur (K)">✂️ Coupe</button>
       <button class="toggle" id="t-dis" title="Démontage pas à pas, de la carrosserie jusqu'au châssis (D)">🔧 Démonter</button>
       <button class="toggle" id="t-xray" title="Rayons X : rend transparent tout sauf la sélection (X)">🩻 Rayons X</button>
       <button class="toggle" id="t-wire" title="Affichage filaire (W)">🕸 Filaire</button>
@@ -116,6 +127,8 @@
         <tr><td>G / R</td><td>Déplacer / pivoter la pièce (poignées 3D)</td></tr>
         <tr><td>I / H</td><td>Isoler / masquer la sélection</td></tr>
         <tr><td>E</td><td>Basculer la vue éclatée</td></tr>
+        <tr><td>P</td><td>Animer le fonctionnement (moteur : vilebrequin, pistons, bielles, soupapes ; véhicules : roues, hélices, rotors)</td></tr>
+        <tr><td>K</td><td>Coupe : trancher le modèle selon X, Y ou Z au millimètre près</td></tr>
         <tr><td>D</td><td>Démontage pas à pas (→ démonter, ← remonter, Espace : étape suivante)</td></tr>
         <tr><td>Page ↓ / Page ↑</td><td>Retirer / remettre une couche (carrosserie → intérieur → mécanique → trains → châssis)</td></tr>
         <tr><td>X / W / C / L / M</td><td>Rayons X / filaire / cotes / étiquettes / mesure</td></tr>

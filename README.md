@@ -5,11 +5,13 @@ chaque pièce, vis, écrou, rondelle ou rivet est un objet 3D **nommé**, avec s
 son matériau, sa norme et son couple de serrage. On peut le sélectionner, le chercher par son nom, le déplacer,
 le pivoter, l'isoler, et retirer les couches du véhicule **de l'extérieur jusqu'au châssis**.
 
-## Catalogue (43 types, ≈ 20 000 pièces)
+## Catalogue (52 types, ≈ 26 000 pièces)
 
 | Catégorie | Types |
 |---|---|
-| ✈️ Aéronefs | Monomoteur léger à aile haute · Avion de ligne biréacteur · Jet d'affaires · Hélicoptère monoturbine |
+| ✈️ Aéronefs | Monomoteur léger à aile haute · Avion de ligne biréacteur · Gros porteur long-courrier · Très gros porteur quadriréacteur · Jet d'affaires · Hélicoptère monoturbine |
+| 🚀 Espace | Lanceur lourd cryogénique + 2 boosters · Lanceur réutilisable 9 moteurs (jambes, grilles) · Moteur-fusée cryogénique détaillé |
+| ⚙️ Moteurs | 4 cylindres essence 1,6 L turbo · 6 cylindres diesel 12,8 L · V8 5,0 L · 4 cylindres à plat (boxer) – chaque piston, segment, soupape, clavette, coussinet et vis |
 | 🚗 Voitures | Citadine · Berline · Break · SUV 4×4 · Monospace 7 places · Coupé sportif · Pick-up double cabine · Électrique |
 | 🚐 Utilitaires | Fourgonnette · Fourgon L2H2 · Grand fourgon L4H3 propulsion à roues jumelées |
 | 🚚 Camions | Tracteur routier 4×2 · Tracteur 6×2 · Porteur benne 8×4 · Porteur fourgon 4×2 |
@@ -51,6 +53,8 @@ Chaque type indique des **constructeurs qui fabriquent ce type de véhicule** (e
 | I / H | Isoler / masquer |
 | Page ↓ / Page ↑ | Retirer / remettre une couche |
 | E | Vue éclatée |
+| P | **Fonctionnement** : moteurs (vilebrequin, bielles, pistons, cames et soupapes synchronisés, phase de chaque cylindre), fusées (séquence de vol), roues, hélices, rotors |
+| K | **Coupe** : trancher le modèle selon X, Y ou Z, au millimètre près, pour voir l'intérieur |
 | X / W / C / L / M | Rayons X / filaire / cotes / étiquettes / mesure |
 | / | Aller à la recherche |
 | Échap | Désélectionner |
