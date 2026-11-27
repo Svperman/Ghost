@@ -32,6 +32,7 @@ Chaque type indique des **constructeurs qui fabriquent ce type de véhicule** (e
 - **Arborescence** complète (ensembles → sous-ensembles → pièces) avec compteurs et 👁 afficher/masquer
 - **Recherche** par nom, référence ou matériau (insensible aux accents) – `Entrée` sélectionne le premier résultat
 - **Fiche pièce** : référence, couche, matériau, norme, couple de serrage, cotes nominales, encombrement mesuré, position
+- **🔧 Démontage pas à pas** (touche D) : retire un sous-ensemble après l'autre, de la carrosserie au châssis, avec la liste et les cotes des pièces de chaque étape ; lecture automatique, remontage, et chaque pièce peut être affichée seule
 - **🧅 Couches** : retirer la carrosserie, puis l'intérieur, la mécanique, les trains roulants → **châssis seul**
 - **💥 Vue éclatée** hiérarchique
 - **🩻 Rayons X**, **🕸 filaire**, **📏 cotes** d'encombrement, **🏷 étiquettes**, **📐 mesure** point à point en mm
@@ -126,6 +127,16 @@ cabriolet: {
 
 Toutes les cotes sont en millimètres. Repère : X vers l'avant, Y vers le haut, Z vers la droite, origine au sol.
 Si vous disposez des cotes réelles d'un modèle précis, il suffit de les saisir dans une nouvelle entrée.
+
+## Publication automatique (GitHub Pages)
+
+Le dépôt étant public, le site est publié gratuitement sur **https://svperman.github.io/Ghost/** par le workflow
+`.github/workflows/deploy-pages.yml`, **à chaque push sur `main`** (ou à la demande : onglet Actions → « Publier sur GitHub Pages » → Run workflow).
+
+Réglage à faire une seule fois sur GitHub : **Settings → Pages → Build and deployment → Source : GitHub Actions**.
+
+GitHub Pages ne permet pas les en-têtes de sécurité de `vercel.json` (CSP, HSTS…) ni la mesure d'audience Vercel ; HTTPS y est en revanche automatique.
+Pour un domaine personnalisé et les en-têtes de sécurité, préférez Vercel (ci-dessous).
 
 ## Mise en ligne (Vercel)
 

@@ -29,7 +29,8 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_');
   const site = (env.VITE_SITE_URL || 'https://ghost-explorateur.vercel.app').replace(/\/$/, '');
   return {
-    base: '/',
+    // '/' sur Vercel ; '/Ghost/' sur GitHub Pages (défini par le workflow de publication)
+    base: env.VITE_BASE || '/',
     server: { host: true, port: 5173, open: false },
     build: {
       chunkSizeWarningLimit: 1500,

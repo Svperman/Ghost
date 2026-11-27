@@ -46,7 +46,7 @@ renderer.domElement.setAttribute('role', 'img');
 renderer.domElement.setAttribute('aria-label', 'Vue 3D du véhicule : faites glisser pour tourner, molette pour zoomer, clic pour sélectionner une pièce');
 
 // Mesure d'audience Vercel Web Analytics : sans cookie, sans donnée personnelle (actif seulement en production)
-inject({ mode: import.meta.env.PROD ? 'production' : 'development', debug: false });
+if (import.meta.env.VITE_ANALYTICS !== 'none') inject({ mode: import.meta.env.PROD ? 'production' : 'development', debug: false });
 
 const labelRenderer = new CSS2DRenderer();
 labelRenderer.domElement.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;';
@@ -141,6 +141,7 @@ function loadVehicle(cat, type) {
       state.root.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
     }
     clearMeasure();
+    if (dis.on) stopDisassembly(true);
     state.key = key; state.cat = cat; state.type = type;
     state.root = asm.object;
     state.rootNode = asm.node;
@@ -222,6 +223,7 @@ function applyExplode() {
     const b = o.userData.base;
     if (!b) return;
     o.position.copy(b.pos).addScaledVector(b.explode, t).add(o.userData.user);
+    if (o.userData.disOff) o.position.add(o.userData.disOff);
   });
   updateDimsOverlay();
 }
@@ -317,7 +319,7 @@ function setView(v, animate = true) {
 }
 
 function isVisible(o) { for (let p = o; p; p = p.parent) if (!p.visible) return false; return true; }
-function refreshVis(o) { o.visible = !o.userData.userHidden && !o.userData.layerHidden; }
+function refreshVis(o) { o.visible = !o.userData.userHidden && !o.userData.layerHidden && !o.userData.disHidden; }
 function setUserHidden(o, h) { o.userData.userHidden = h; refreshVis(o); }
 
 // ============================================================================ Couches (extérieur → châssis)
@@ -785,9 +787,159 @@ window.addEventListener('keydown', (ev) => {
   else if (k === 'l') toggle('labels');
   else if (k === 'm') toggle('measure');
   else if (k === 'e') animateExplode(state.explode > 0.01 ? 0 : 0.6);
+  else if (k === 'd') dis.on ? stopDisassembly() : startDisassembly();
+  else if (dis.on && (ev.key === 'ArrowRight' || ev.key === ' ')) { ev.preventDefault(); disStep(1); }
+  else if (dis.on && ev.key === 'ArrowLeft') { ev.preventDefault(); disStep(-1); }
   else if (k === '/' ) { ev.preventDefault(); searchEl.focus(); }
   else if (k === '?') $('#help').hidden = false;
 });
+
+// ============================================================================ Démontage pas à pas
+// Chaque étape retire un sous-ensemble (ses pièces directes), de l'extérieur vers le châssis.
+const dis = { on: false, steps: [], i: 0, timer: null };
+let disAnim = null;
+function buildDisSteps() {
+  const steps = [];
+  const center = new THREE.Box3().setFromObject(state.root).getCenter(new THREE.Vector3());
+  walk(state.rootNode, (n) => {
+    if (n.kind !== 'group') return;
+    const parts = n.children.filter((c) => c.kind === 'part');
+    if (!parts.length) return;
+    const box = new THREE.Box3();
+    for (const p of parts) box.expandByObject(p.object);
+    const c = box.getCenter(new THREE.Vector3());
+    const layer = Math.min(...parts.map((p) => layerIndex(p.layer)));
+    steps.push({ node: n, parts, center: c, layer, dist: c.distanceTo(center) });
+  });
+  // Couche (carrosserie → châssis), puis de l'extérieur vers le centre ; la visserie part avant la pièce qu'elle tient
+  steps.sort((a, b) => a.layer - b.layer || b.dist - a.dist);
+  dis.vehicleCenter = center;
+  dis.size = new THREE.Box3().setFromObject(state.root).getSize(new THREE.Vector3()).length();
+  return steps;
+}
+function startDisassembly() {
+  if (!state.root) return;
+  if (state.peel) setPeel(0);
+  if (state.explode > 0.01) { state.explode = 0; explodeEl.value = 0; applyExplode(); }
+  dis.steps = buildDisSteps();
+  dis.i = 0;
+  dis.on = true;
+  $('#t-dis').classList.add('on');
+  $('#dis-panel').hidden = false;
+  renderDisPanel();
+}
+function stopDisassembly(silent = false) {
+  clearInterval(dis.timer); dis.timer = null;
+  disAnim = null;
+  for (const st of dis.steps) for (const p of st.parts) { p.object.userData.disHidden = false; p.object.userData.disOff = null; refreshVis(p.object); }
+  dis.on = false; dis.steps = []; dis.i = 0;
+  $('#t-dis').classList.remove('on');
+  $('#dis-panel').hidden = true;
+  $('#dis-panel').innerHTML = '';
+  if (!silent) { applyExplode(); renderTreeVisibility(); select(null); }
+}
+/** Direction d'éjection d'une étape, exprimée dans le repère du parent de chaque pièce */
+function ejectVector(st, mesh) {
+  const dir = st.center.clone().sub(dis.vehicleCenter);
+  dir.y = Math.max(dir.y, 0) + dis.size * 0.05;
+  if (dir.lengthSq() < 1) dir.set(0, 1, 0);
+  dir.normalize().multiplyScalar(dis.size * 0.45);
+  const q = new THREE.Quaternion(), sc = new THREE.Vector3();
+  mesh.parent.matrixWorld.decompose(new THREE.Vector3(), q, sc);
+  return dir.applyQuaternion(q.invert()).divide(sc);
+}
+function disStep(delta) {
+  if (!dis.on || disAnim) return;
+  const n = dis.steps.length;
+  if (delta > 0 && dis.i >= n) { pauseDis(); return; }
+  if (delta < 0 && dis.i <= 0) return;
+  const st = delta > 0 ? dis.steps[dis.i] : dis.steps[dis.i - 1];
+  const meshes = st.parts.map((p) => p.object);
+  for (const m of meshes) { m.userData.disHidden = false; refreshVis(m); if (!m.userData.disOff) m.userData.disOff = new THREE.Vector3(); }
+  const targets = meshes.map((m) => (delta > 0 ? ejectVector(st, m) : new THREE.Vector3()));
+  const froms = meshes.map((m) => m.userData.disOff.clone());
+  if (delta < 0) meshes.forEach((m, k) => { if (!froms[k].lengthSq()) froms[k].copy(ejectVector(st, m)); });
+  disAnim = { t0: performance.now(), d: dis.timer ? 450 : 650, meshes, froms, targets, out: delta > 0, st };
+  dis.i += delta;
+  select(st.node, { fromTree: false });
+  document.body.classList.remove('show-details'); // sur téléphone, on garde la vue 3D visible
+  renderDisPanel();
+}
+function stepDisAnim(now) {
+  if (!disAnim) return;
+  let k = Math.min(1, (now - disAnim.t0) / disAnim.d);
+  const e = 1 - (1 - k) ** 3;
+  disAnim.meshes.forEach((m, j) => { m.userData.disOff.lerpVectors(disAnim.froms[j], disAnim.targets[j], e); });
+  applyExplode();
+  if (k >= 1) {
+    if (disAnim.out) for (const m of disAnim.meshes) { m.userData.disHidden = true; refreshVis(m); }
+    else for (const m of disAnim.meshes) m.userData.disOff = null;
+    disAnim = null;
+    applyExplode();
+    renderTreeVisibility();
+  }
+}
+function pauseDis() { clearInterval(dis.timer); dis.timer = null; renderDisPanel(); }
+function playDis() {
+  if (dis.timer) { pauseDis(); return; }
+  if (dis.i >= dis.steps.length) { resetDis(); }
+  dis.timer = setInterval(() => { if (!disAnim) disStep(1); }, 900);
+  renderDisPanel();
+}
+function resetDis() {
+  for (const st of dis.steps) for (const p of st.parts) { p.object.userData.disHidden = false; p.object.userData.disOff = null; refreshVis(p.object); }
+  disAnim = null; dis.i = 0; applyExplode(); renderTreeVisibility(); select(null); renderDisPanel();
+}
+function buildDisPanel() {
+  const P = $('#dis-panel');
+  P.innerHTML = `
+    <div class="dis-head"><b>🔧 Démontage</b><span></span><button data-d="close" title="Quitter le démontage (D)" aria-label="Quitter le démontage">✕</button></div>
+    <div class="dis-bar"><i></i></div>
+    <div class="dis-body"></div>
+    <div class="dis-ctl">
+      <button data-d="first" title="Tout remonter">⏮</button>
+      <button data-d="prev" title="Remonter l'étape précédente (←)">◀ Remonter</button>
+      <button data-d="play" title="Démontage automatique"></button>
+      <button data-d="next" title="Démonter l'étape suivante (→)">Démonter ▶</button>
+    </div>`;
+  P.querySelector('[data-d="close"]').onclick = () => stopDisassembly();
+  P.querySelector('[data-d="first"]').onclick = () => { pauseDis(); resetDis(); };
+  P.querySelector('[data-d="prev"]').onclick = () => { pauseDis(); disStep(-1); };
+  P.querySelector('[data-d="next"]').onclick = () => { pauseDis(); disStep(1); };
+  P.querySelector('[data-d="play"]').onclick = playDis;
+  P.querySelector('.dis-body').onclick = (ev) => {
+    const li = ev.target.closest('li[data-k]');
+    const st = dis.i > 0 ? dis.steps[dis.i - 1] : null;
+    if (!li || !st) return;
+    pauseDis();
+    const part = st.parts[+li.dataset.k];
+    // Montre la pièce remise à sa place et centre la caméra dessus
+    part.object.userData.disHidden = false; part.object.userData.disOff = null; refreshVis(part.object); applyExplode();
+    select(part, { focus: true });
+    document.body.classList.remove('show-details');
+  };
+}
+function renderDisPanel() {
+  const P = $('#dis-panel');
+  if (!P.firstElementChild) buildDisPanel();
+  const n = dis.steps.length, i = dis.i;
+  const st = i > 0 ? dis.steps[i - 1] : null;
+  const removed = dis.steps.slice(0, i).reduce((a, s) => a + s.parts.length, 0);
+  const total = dis.steps.reduce((a, s) => a + s.parts.length, 0);
+  P.querySelector('.dis-head span').textContent = `Étape ${i} / ${n} · ${removed} / ${total} pièces retirées`;
+  P.querySelector('.dis-bar i').style.width = `${n ? (i / n) * 100 : 0}%`;
+  P.querySelector('.dis-body').innerHTML = st
+    ? `<div class="dis-step"><small>${esc(LAYERS[st.layer].label)}</small><strong>${esc(st.node.name)}</strong><span>${st.parts.length} pièce${st.parts.length > 1 ? 's' : ''} retirée${st.parts.length > 1 ? 's' : ''} – touchez-en une pour la voir</span></div>
+      <ul class="dis-parts">${st.parts.map((p, k) => `<li data-k="${k}">${isFastener(p) ? '🔩' : '▫️'} ${esc(p.name)}${p.dims && Object.keys(p.dims).length ? `<em>${esc(Object.entries(p.dims).slice(0, 2).map(([a, v]) => `${a} ${typeof v === 'number' ? nf.format(v) : v}`).join(' · '))}</em>` : ''}</li>`).join('')}</ul>`
+    : `<div class="dis-step"><strong>${n} étapes, de la carrosserie jusqu'au châssis</strong><span>Appuyez sur « Démonter » pour retirer le premier sous-ensemble, ou sur « Lecture » pour tout démonter automatiquement.</span></div>`;
+  const play = P.querySelector('[data-d="play"]');
+  play.textContent = dis.timer ? '⏸ Pause' : '⏵ Lecture';
+  play.classList.toggle('on', !!dis.timer);
+  P.querySelector('[data-d="first"]').disabled = !i;
+  P.querySelector('[data-d="prev"]').disabled = !i;
+  P.querySelector('[data-d="next"]').disabled = i >= n;
+}
+$('#t-dis').onclick = () => (dis.on ? stopDisassembly() : startDisassembly());
 
 // ============================================================================ Boucle de rendu
 function resize() {
@@ -810,7 +962,7 @@ controls.addEventListener('change', wake);
 function tick(now) {
   requestAnimationFrame(tick);
   if (LITE) {
-    if (explodeAnim || camAnim || !$('#loading').style.display.includes('none')) activeFrames = Math.max(activeFrames, 30);
+    if (explodeAnim || camAnim || disAnim || !$('#loading').style.display.includes('none')) activeFrames = Math.max(activeFrames, 30);
     if (activeFrames <= 0) return;
     activeFrames--;
   }
@@ -823,6 +975,7 @@ function tick(now) {
     if (k >= 1) explodeAnim = null;
   }
   stepCamAnim(now);
+  stepDisAnim(now);
   controls.update();
   if (LITE) {
     // Sans tampon de profondeur logarithmique : plan proche ajusté à la distance pour éviter les scintillements
