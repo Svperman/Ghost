@@ -53,11 +53,23 @@ Chaque type indique des **constructeurs qui fabriquent ce type de véhicule** (e
 | I / H | Isoler / masquer |
 | Page ↓ / Page ↑ | Retirer / remettre une couche |
 | E | Vue éclatée |
-| P | **Fonctionnement** : moteurs (vilebrequin, bielles, pistons, cames et soupapes synchronisés, phase de chaque cylindre), fusées (séquence de vol), roues, hélices, rotors |
+| P | **Fonctionnement** : moteurs (y compris ceux intégrés aux voitures, camions, bus…) (vilebrequin, bielles, pistons, cames et soupapes synchronisés, phase de chaque cylindre), fusées (séquence de vol), roues, hélices, rotors |
 | K | **Coupe** : trancher le modèle selon X, Y ou Z, au millimètre près, pour voir l'intérieur |
 | X / W / C / L / M | Rayons X / filaire / cotes / étiquettes / mesure |
 | / | Aller à la recherche |
 | Échap | Désélectionner |
+
+## 💥 Crash test
+
+Onglet **Crash test** (barre du haut, ou adresse `#crash`) : simulation physique d'un choc, au ralenti.
+
+- Véhicule testé : toutes les voitures, utilitaires, camions et bus du catalogue (masse estimée, réglable).
+- Scénarios : frontal contre mur rigide, frontal décalé 40 % (barrière déformable), poteau / arbre, choc latéral contre poteau, contre un autre véhicule (au choix, à la vitesse voulue), choc arrière.
+- Réglages : vitesse(s), masse, ceinture, airbags, ralenti, caméra (côté, dessus, face, habitacle), carrosserie transparente.
+- Calcul (modèle 1D masses + ressorts d'écrasement plastiques, pas de 0,05 ms) : variation de vitesse, décélérations, écrasement, énergie, durée du choc, rebond ; mannequin retenu par la ceinture, l'airbag, la porte ou le dossier ; accélération thoracique 3 ms, HIC15, risque de blessure grave à la tête (Prasad-Mertz).
+- Rendu : carrosserie déformée sommet par sommet, phares et boucliers qui se détachent, pare-brise fissuré, airbag qui se gonfle, mannequin projeté.
+
+Modèle pédagogique : les ordres de grandeur sont proches des essais réels (≈ 40 g et 600 mm d'écrasement pour une berline à 56 km/h contre un mur) mais ce n'est pas un calcul homologué.
 
 ## Importer un modèle 3D réel (.glb)
 

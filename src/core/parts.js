@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 // Sous-ensembles réutilisables par plusieurs véhicules (cotes en mm)
 import { S, boltCircle, axisRot } from './builder.js';
 
@@ -108,6 +109,7 @@ export function inlineEngine(asm, name, o) {
   const L = n * pitch + 60, blockH = stroke * 2.6, blockW = bore + 90;
   const deck = blockH / 2;
   const cx = (i) => -((n - 1) * pitch) / 2 + i * pitch;
+  const AN = { crank: [], cyl: [], valves: [], cams: [] }; // pièces animées
 
   const bloc = e.group('Bloc-cylindres', { code: o.code || 'MOT' });
   bloc.part('Carter-cylindres', S.box(L, blockH, blockW), { mat: o.blockMat || 'fonte', desc: `${n} cylindres en ligne – alésage ${bore} mm, course ${stroke} mm, cylindrée ${Math.round(n * Math.PI * (bore / 20) ** 2 * stroke / 10)} cm³` });
@@ -127,8 +129,10 @@ export function inlineEngine(asm, name, o) {
     for (const [k, side, lab] of [[0, -1, 'admission'], [1, 1, 'échappement']]) {
       for (let v = 0; v < (o.valves ?? 2); v++) {
         const off = (o.valves ?? 2) > 1 ? (v ? 1 : -1) * bore * 0.2 : 0;
-        head.part(`Soupape ${lab} cyl.${i + 1}${(o.valves ?? 2) > 1 ? (v ? 'b' : 'a') : ''}`, S.cyl(7, headH * 0.9, 'y'), { pos: [cx(i) + off, deck + headH * 0.5, side * bore * 0.22], mat: 'inox' });
-        head.part(`Ressort de soupape ${lab} cyl.${i + 1}${(o.valves ?? 2) > 1 ? (v ? 'b' : 'a') : ''}`, S.spring(22, 3.5, 40, 6), { pos: [cx(i) + off, deck + headH * 0.62, side * bore * 0.22], mat: 'acier' });
+        const VA = { i, lab };
+        AN.valves.push(VA);
+        VA.v = head.part(`Soupape ${lab} cyl.${i + 1}${(o.valves ?? 2) > 1 ? (v ? 'b' : 'a') : ''}`, S.cyl(7, headH * 0.9, 'y'), { pos: [cx(i) + off, deck + headH * 0.5, side * bore * 0.22], mat: 'inox' });
+        VA.s = head.part(`Ressort de soupape ${lab} cyl.${i + 1}${(o.valves ?? 2) > 1 ? (v ? 'b' : 'a') : ''}`, S.spring(22, 3.5, 40, 6), { pos: [cx(i) + off, deck + headH * 0.62, side * bore * 0.22], mat: 'acier' });
       }
       void k;
     }
@@ -146,24 +150,27 @@ export function inlineEngine(asm, name, o) {
 
   const eq = e.group('Équipage mobile', { code: o.code || 'MOT' });
   const crankY = -deck + stroke * 0.6;
-  eq.part('Vilebrequin', S.cyl(o.journal || 55, L + 40, 'x'), { pos: [0, crankY, 0], mat: 'acierHR' });
+  AN.crank.push(eq.part('Vilebrequin', S.cyl(o.journal || 55, L + 40, 'x'), { pos: [0, crankY, 0], mat: 'acierHR' }));
   for (let i = 0; i < n; i++) {
     const phase = [0, 180, 180, 0, 0, 180, 180, 0][i] ?? (i * 120);
     const up = phase === 0 ? 1 : -1;
-    eq.part(`Contrepoids vilebrequin ${i + 1}`, S.box(24, stroke, bore * 0.9), { pos: [cx(i) - pitch * 0.3, crankY - up * stroke * 0.25, 0], mat: 'acierHR' });
+    const C = { i, th0: phase, piston: [], cap: [] };
+    AN.cyl.push(C);
+    AN.crank.push(eq.part(`Contrepoids vilebrequin ${i + 1}`, S.box(24, stroke, bore * 0.9), { pos: [cx(i) - pitch * 0.3, crankY - up * stroke * 0.25, 0], mat: 'acierHR' }));
     const pinY = crankY + up * stroke / 2;
     const pistonY = pinY + stroke * 1.65;
-    eq.part(`Piston ${i + 1}`, S.cyl(bore - 0.5, bore * 0.75, 'y'), { pos: [cx(i), pistonY, 0], mat: 'aluminium' });
-    for (let r = 0; r < 3; r++) eq.part(`Segment ${['de feu', "d'étanchéité", 'racleur'][r]} piston ${i + 1}`, S.tube(bore, bore - 7, r === 2 ? 3 : 1.5, 'y'), { pos: [cx(i), pistonY + bore * 0.3 - r * 7, 0], mat: 'fonte' });
-    eq.part(`Axe de piston ${i + 1}`, S.tube(o.pin || 22, (o.pin || 22) - 8, bore - 10, 'z'), { pos: [cx(i), pistonY - bore * 0.1, 0], mat: 'acierHR' });
-    eq.part(`Bielle ${i + 1}`, S.rod([cx(i), pinY, 0], [cx(i), pistonY - bore * 0.1, 0], o.rodD || 26), { mat: 'acierHR' });
-    eq.part(`Tête de bielle ${i + 1}`, S.tube((o.journal || 55) + 28, (o.journal || 55) - 6, 24, 'x'), { pos: [cx(i), pinY, 0], mat: 'acierHR' });
-    eq.part(`Vis de chapeau de bielle ${i + 1}a`, S.bolt(9, 45, 'y'), { pos: [cx(i), pinY - 20, -(o.journal || 55) / 2 - 8], rot: [180, 0, 0], mat: 'acierHR', couple: '20 N·m + 90°' });
-    eq.part(`Vis de chapeau de bielle ${i + 1}b`, S.bolt(9, 45, 'y'), { pos: [cx(i), pinY - 20, (o.journal || 55) / 2 + 8], rot: [180, 0, 0], mat: 'acierHR', couple: '20 N·m + 90°' });
+    C.pp0 = pistonY - bore * 0.1; C.pin0 = pinY; C.x = cx(i);
+    C.piston.push(eq.part(`Piston ${i + 1}`, S.cyl(bore - 0.5, bore * 0.75, 'y'), { pos: [cx(i), pistonY, 0], mat: 'aluminium' }));
+    for (let r = 0; r < 3; r++) C.piston.push(eq.part(`Segment ${['de feu', "d'étanchéité", 'racleur'][r]} piston ${i + 1}`, S.tube(bore, bore - 7, r === 2 ? 3 : 1.5, 'y'), { pos: [cx(i), pistonY + bore * 0.3 - r * 7, 0], mat: 'fonte' }));
+    C.piston.push(eq.part(`Axe de piston ${i + 1}`, S.tube(o.pin || 22, (o.pin || 22) - 8, bore - 10, 'z'), { pos: [cx(i), pistonY - bore * 0.1, 0], mat: 'acierHR' }));
+    C.rod = eq.part(`Bielle ${i + 1}`, S.rod([cx(i), pinY, 0], [cx(i), pistonY - bore * 0.1, 0], o.rodD || 26), { mat: 'acierHR' });
+    C.cap.push(eq.part(`Tête de bielle ${i + 1}`, S.tube((o.journal || 55) + 28, (o.journal || 55) - 6, 24, 'x'), { pos: [cx(i), pinY, 0], mat: 'acierHR' }));
+    C.cap.push(eq.part(`Vis de chapeau de bielle ${i + 1}a`, S.bolt(9, 45, 'y'), { pos: [cx(i), pinY - 20, -(o.journal || 55) / 2 - 8], rot: [180, 0, 0], mat: 'acierHR', couple: '20 N·m + 90°' }));
+    C.cap.push(eq.part(`Vis de chapeau de bielle ${i + 1}b`, S.bolt(9, 45, 'y'), { pos: [cx(i), pinY - 20, (o.journal || 55) / 2 + 8], rot: [180, 0, 0], mat: 'acierHR', couple: '20 N·m + 90°' }));
   }
-  eq.part('Volant moteur', S.cyl(o.flywheel || 280, 30, 'x', 60), { pos: [L / 2 + 40, crankY, 0], mat: 'fonte' });
-  boltCircle(eq, { n: 6, pcd: 75, d: 10, L: 22, axis: 'x', at: [L / 2 + 58, crankY, 0], dir: 1, label: 'Vis de volant moteur', kind: 'cap', couple: '60 N·m + 90°' });
-  eq.part('Couronne de démarreur', S.tube((o.flywheel || 280) + 20, (o.flywheel || 280) - 4, 16, 'x', 80), { pos: [L / 2 + 40, crankY, 0], mat: 'acierHR' });
+  AN.crank.push(eq.part('Volant moteur', S.cyl(o.flywheel || 280, 30, 'x', 60), { pos: [L / 2 + 40, crankY, 0], mat: 'fonte' }));
+  AN.crank.push(...boltCircle(eq, { n: 6, pcd: 75, d: 10, L: 22, axis: 'x', at: [L / 2 + 58, crankY, 0], dir: 1, label: 'Vis de volant moteur', kind: 'cap', couple: '60 N·m + 90°' }));
+  AN.crank.push(eq.part('Couronne de démarreur', S.tube((o.flywheel || 280) + 20, (o.flywheel || 280) - 4, 16, 'x', 80), { pos: [L / 2 + 40, crankY, 0], mat: 'acierHR' }));
 
   const lub = e.group('Lubrification', { code: o.code || 'MOT' });
   lub.part('Carter d\'huile', S.box(L - 30, stroke * 1.2, blockW + 20), { pos: [0, -deck - stroke * 0.6, 0], mat: 'aluminium' });
@@ -177,9 +184,9 @@ export function inlineEngine(asm, name, o) {
 
   const dist = e.group('Distribution & accessoires', { code: o.code || 'MOT' });
   const fx = -L / 2 - 25;
-  dist.part('Poulie de vilebrequin', S.cyl(150, 30, 'x'), { pos: [fx, crankY, 0], mat: 'fonte' });
-  dist.part('Pignon d\'arbre à cames admission', S.cyl(120, 22, 'x'), { pos: [fx, deck + headH * 0.8, -bore * 0.28], mat: 'acier' });
-  dist.part('Pignon d\'arbre à cames échappement', S.cyl(120, 22, 'x'), { pos: [fx, deck + headH * 0.8, bore * 0.28], mat: 'acier' });
+  AN.crank.push(dist.part('Poulie de vilebrequin', S.cyl(150, 30, 'x'), { pos: [fx, crankY, 0], mat: 'fonte' }));
+  AN.cams.push(dist.part('Pignon d\'arbre à cames admission', S.cyl(120, 22, 'x'), { pos: [fx, deck + headH * 0.8, -bore * 0.28], mat: 'acier' }));
+  AN.cams.push(dist.part('Pignon d\'arbre à cames échappement', S.cyl(120, 22, 'x'), { pos: [fx, deck + headH * 0.8, bore * 0.28], mat: 'acier' }));
   dist.part('Courroie de distribution', S.pipe([[fx, crankY - 75, 0], [fx, deck + headH * 0.8 + 60, -bore * 0.5], [fx, deck + headH * 0.8 + 60, bore * 0.5]], 8, true), { mat: 'caoutchouc' });
   dist.part('Galet tendeur', S.cyl(70, 28, 'x'), { pos: [fx, 40, blockW / 2], mat: 'acier' });
   dist.part('Alternateur', S.cyl(o.alt || 130, 150, 'x'), { pos: [-L * 0.25, deck - 40, blockW / 2 + 90], mat: 'aluminium', desc: o.diesel ? '24 V – 110 A' : '14 V – 150 A' });
@@ -204,7 +211,60 @@ export function inlineEngine(asm, name, o) {
     ech.part('Turbocompresseur – carter turbine', S.cyl(170, 110, 'z'), { pos: [0, deck - 200, ez + 60], mat: 'fonte' });
     ech.part('Turbocompresseur – carter compresseur', S.cyl(180, 90, 'z'), { pos: [0, deck - 200, ez + 160], mat: 'aluminium' });
   }
+  engineKinematics(e, AN, { n, stroke, crankY, camY: deck + headH * 0.8, lift: stroke * 0.11 });
   return e;
+}
+
+/**
+ * Cinématique d'un moteur en ligne : vilebrequin, bielles, pistons, soupapes (cycle à 4 temps).
+ * Enregistre e.object.userData.animate(angle) et .phases(angle).
+ */
+function engineKinematics(e, AN, { n, stroke, crankY, camY, lift }) {
+  const r = stroke / 2, X = new THREE.Vector3(1, 0, 0), D2R = Math.PI / 180;
+  const C0 = new THREE.Vector3(0, crankY, 0);
+  const rodL = AN.cyl[0].pp0 - AN.cyl[0].pin0;
+  // allumage le plus régulier possible (chaque cylindre s'allume à l'un de ses deux PMH)
+  const tdc = AN.cyl.map((c) => ((-c.th0 % 360) + 360) % 360);
+  let best = tdc, bestGap = -1;
+  for (let m = 0; m < 1 << n; m++) {
+    const f = tdc.map((t, i) => t + ((m >> i) & 1) * 360).sort((a, b) => a - b);
+    let g = n > 1 ? 720 - f[n - 1] + f[0] : 720;
+    for (let i = 1; i < n; i++) g = Math.min(g, f[i] - f[i - 1]);
+    if (g > bestGap) { bestGap = g; best = tdc.map((t, i) => t + ((m >> i) & 1) * 360); }
+  }
+  AN.cyl.forEach((c, i) => { c.fire = best[i]; });
+  const cyc = (c, deg) => (((deg - c.fire) % 720) + 720) % 720;
+  const bump = (x, a, b) => (x > a && x < b ? Math.sin(Math.PI * (x - a) / (b - a)) : 0);
+  const set = (o, pos, quat, sy) => { o.userData.anim = { pos, quat: quat || new THREE.Quaternion(), sy }; };
+  const rot = (o, C, ang) => {
+    const R = new THREE.Quaternion().setFromAxisAngle(X, ang);
+    const p0 = o.userData.base ? o.userData.base.pos : o.position;
+    set(o, C.clone().add(p0.clone().sub(C).applyQuaternion(R)).sub(p0), R);
+  };
+  e.object.userData.animate = (deg) => {
+    const d = deg * D2R;
+    for (const o of AN.crank) rot(o, C0, d);
+    for (const o of AN.cams) { const p0 = o.userData.base ? o.userData.base.pos : o.position; rot(o, new THREE.Vector3(0, p0.y, p0.z), d / 2); }
+    for (const c of AN.cyl) {
+      const th = (c.th0 + deg) * D2R;
+      const py = crankY + r * Math.cos(th), pz = r * Math.sin(th);
+      const pp = py + Math.sqrt(rodL ** 2 - pz ** 2);
+      for (const o of c.piston) set(o, new THREE.Vector3(0, pp - c.pp0, 0));
+      for (const o of c.cap) set(o, new THREE.Vector3(0, py - c.pin0, pz));
+      const R = new THREE.Quaternion().setFromAxisAngle(X, Math.atan2(-pz, pp - py));
+      set(c.rod, new THREE.Vector3(c.x, pp, 0).sub(new THREE.Vector3(c.x, c.pp0, 0).applyQuaternion(R)), R);
+    }
+    for (const v of AN.valves) {
+      const k = cyc(AN.cyl[v.i], deg);
+      const l = lift * (v.lab === 'admission' ? bump(k, 350, 590) + bump(k + 720, 350, 590) : bump(k, 130, 370));
+      set(v.v, new THREE.Vector3(0, -l, 0));
+      set(v.s, new THREE.Vector3(0, -l / 2, 0), null, (40 - l) / 40);
+    }
+  };
+  const PH = [[180, 'Combustion – détente', '#ff6a3d'], [360, 'Échappement', '#9aa0a6'], [540, 'Admission', '#3d8bff'], [720, 'Compression', '#ffb020']];
+  e.object.userData.phases = (deg) => AN.cyl.map((c) => { const p = PH.find((q) => cyc(c, deg) < q[0]); return { label: `Cyl. ${c.i + 1}`, value: p[1], color: p[2] }; });
+  e.object.userData.animTitle = (deg) => `Moteur : vilebrequin ${Math.round(deg % 360)}°`;
+  void camY;
 }
 
 /** Siège automobile / camion */
