@@ -13,7 +13,7 @@ export function buildJet(type = 'ligne') {
   const P = JET_TYPES[type] || JET_TYPES.ligne;
   const { R, FY, L } = P;
   const xN = L / 2, xT = -L / 2;
-  const big = type === 'ligne';
+  const big = P.big ?? type === 'ligne';
   const j = new Assembly(P.label, { prefix: big ? 'AL' : 'JA', code: 'GEN', layer: 'meca', desc: `${P.desc} – longueur ${L} mm – envergure ${P.span} mm` });
 
   // ------------------------------------------------------------------ Fuselage
@@ -134,12 +134,15 @@ export function buildJet(type = 'ligne') {
   }
 
   // ------------------------------------------------------------------ Motorisation
-  const mot = j.group(`Turboréacteurs double flux (×2)`, { code: 'MOT', layer: 'meca' });
-  for (const sd of SIDES) {
+  const engZs = Array.isArray(P.engZ) ? P.engZ : [P.engZ];
+  const mot = j.group(`Turboréacteurs double flux (×${engZs.length * 2})`, { code: 'MOT', layer: 'meca' });
+  const engList = [];
+  for (const sd of SIDES) engZs.forEach((eZ, i) => engList.push([sd, eZ, sd.s < 0 ? engZs.length - i : engZs.length + 1 + i]));
+  for (const [sd, eZ, eNo] of engList) {
     let ex, ey, ez;
-    if (P.engines === 'wing') { ez = sd.s * P.engZ; ex = leAt(P.engZ) + P.nacL * 0.55; ey = yAt(P.engZ) - P.nacR - 450; }
+    if (P.engines === 'wing') { ez = sd.s * eZ; ex = leAt(eZ) + P.nacL * 0.55; ey = yAt(eZ) - P.nacR - 450; }
     else { ez = sd.s * (R + P.nacR + 380); ex = xT + L * 0.28; ey = FY + R * 0.45; }
-    const e = mot.group(`Moteur ${sd.s < 0 ? '1 (gauche)' : '2 (droit)'}`, { code: `MO${sd.c}`, pos: [ex, ey, ez] });
+    const e = mot.group(`Moteur ${eNo} (${sd.s < 0 ? 'gauche' : 'droit'}${engZs.length > 1 ? (Math.abs(eZ) === Math.min(...engZs) ? ', intérieur' : ', extérieur') : ''})`, { code: `MO${eNo}`, pos: [ex, ey, ez] });
     const NL = P.nacL, NR = P.nacR;
     e.part('Nacelle – lèvre d\'entrée d\'air', S.revolve([[NR * 0.86, NL / 2], [NR * 0.98, NL / 2 - 80], [NR, NL / 2 - 300], [NR * 0.9, NL / 2 - 350], [NR * 0.86, NL / 2]], 'x', 64), { mat: 'aluminium', layer: 'ext' });
     e.part('Capot de soufflante', S.revolve([[NR, NL / 2 - 300], [NR * 1.01, NL * 0.1], [NR * 0.97, -NL * 0.05]], 'x', 64), { mat: 'composite', color: P.paint, layer: 'ext' });

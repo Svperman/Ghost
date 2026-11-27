@@ -179,3 +179,16 @@ body.dragging #drop-hint { display: grid; }
   #dis-panel { top: 8px; left: 8px; width: calc(100% - 16px); padding: 8px 10px; }
   #dis-panel .dis-parts { max-height: 92px; }
 }
+
+#anim-hud { position: absolute; top: 10px; left: 10px; background: rgba(15,18,22,.9); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 12px; max-width: min(460px, calc(100% - 20px)); z-index: 3; pointer-events: none; }
+#anim-hud .info { color: var(--muted); margin: 2px 0 6px; }
+#anim-hud .ph { display: flex; flex-wrap: wrap; gap: 4px; }
+#anim-hud .ph span { border: 1px solid; border-radius: 10px; padding: 1px 7px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+#anim-hud .ph i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; }
+#anim-speed { font: inherit; font-size: 12px; color: var(--text); background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 4px; }
+#cut-panel { position: absolute; top: 10px; right: 10px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; background: rgba(15,18,22,.92); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 12px; z-index: 3; max-width: calc(100% - 20px); }
+#cut-panel button { font-size: 12px; padding: 3px 8px; }
+#cut-panel button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+#cut-panel input { width: 160px; accent-color: var(--accent-2); }
+#cut-val { min-width: 110px; font-variant-numeric: tabular-nums; }
+#cut-panel[hidden], #anim-hud[hidden], #anim-speed[hidden], #t-anim[hidden] { display: none; }

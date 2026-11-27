@@ -14,6 +14,8 @@ import { LIGHT_TYPES } from './vehicles/meta/light.js';
 import { BIKE_TYPES } from './vehicles/meta/bike.js';
 import { BOAT_TYPES } from './vehicles/meta/boat.js';
 import { TRAIN_TYPES } from './vehicles/meta/train.js';
+import { ENGINE_TYPES } from './vehicles/meta/engine.js';
+import { ROCKET_TYPES } from './vehicles/meta/rocket.js';
 
 /** Associe chaque type à un générateur chargé à la demande (build renvoie une promesse) */
 const lazy = (types, load, fn, keys = Object.keys(types)) =>
@@ -32,6 +34,8 @@ const light = () => import('./vehicles/light.js');
 const bike = () => import('./vehicles/bike.js');
 const boat = () => import('./vehicles/boat.js');
 const train = () => import('./vehicles/train.js');
+const engine = () => import('./vehicles/engine.js');
+const rocket = () => import('./vehicles/rocket.js');
 
 export const CATALOG = {
   avion: {
@@ -51,11 +55,21 @@ export const CATALOG = {
   velo: { label: 'Vélos', icon: '🚲', types: lazy(BIKE_TYPES, bike, 'buildBike') },
   bateau: { label: 'Bateaux', icon: '⛵', types: lazy(BOAT_TYPES, boat, 'buildBoat') },
   train: { label: 'Ferroviaire', icon: '🚆', types: lazy(TRAIN_TYPES, train, 'buildTrain') },
+  espace: {
+    label: 'Espace', icon: '🚀', types: lazy(ROCKET_TYPES, rocket, 'buildRocket'),
+    layerLabels: ['Coiffe, revêtements & jupes', 'Charge utile & avionique', 'Moteurs, conduites & pressurisation', 'Jambes & grilles de pilotage', 'Structure & réservoirs'],
+    peelSteps: ['Tout afficher', 'Sans coiffe ni revêtement', 'Sans charge utile', 'Sans moteurs', 'Structure seule'],
+  },
+  moteur: {
+    label: 'Moteurs', icon: '⚙️', types: lazy(ENGINE_TYPES, engine, 'buildEngine'),
+    layerLabels: ['Carters & capots', 'Périphériques (admission, échappement, accessoires)', 'Culasse & distribution', 'Équipage mobile (pistons, bielles, vilebrequin)', 'Bloc & culasse (structure)'],
+    peelSteps: ['Tout afficher', 'Sans carters', 'Sans périphériques', 'Sans distribution', 'Bloc seul'],
+  },
   // Modèles .glb importés par l'utilisateur (remplis à l'exécution)
   import: { label: 'Importés', icon: '📦', types: {}, hidden: true },
 };
 
 export const DEFAULT_TYPE = {
   avion: 'monomoteur', voiture: 'berline', utilitaire: 'fourgon', camion: 'tracteur', bus: 'urbain',
-  agricole: 'standard', moto: 'roadster', velo: 'ville', bateau: 'voilier', train: 'locomotive',
+  agricole: 'standard', moto: 'roadster', velo: 'ville', bateau: 'voilier', train: 'locomotive', moteur: 'essence4', espace: 'lanceur',
 };
