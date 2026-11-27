@@ -5,13 +5,13 @@ chaque pièce, vis, écrou, rondelle ou rivet est un objet 3D **nommé**, avec s
 son matériau, sa norme et son couple de serrage. On peut le sélectionner, le chercher par son nom, le déplacer,
 le pivoter, l'isoler, et retirer les couches du véhicule **de l'extérieur jusqu'au châssis**.
 
-## Catalogue (52 types, ≈ 26 000 pièces)
+## Catalogue (65 types, ≈ 38 000 pièces)
 
 | Catégorie | Types |
 |---|---|
 | ✈️ Aéronefs | Monomoteur léger à aile haute · Avion de ligne biréacteur · Gros porteur long-courrier · Très gros porteur quadriréacteur · Jet d'affaires · Hélicoptère monoturbine |
 | 🚀 Espace | Lanceur lourd cryogénique + 2 boosters · Lanceur réutilisable 9 moteurs (jambes, grilles) · Moteur-fusée cryogénique détaillé |
-| ⚙️ Moteurs | 4 cylindres essence 1,6 L turbo · 6 cylindres diesel 12,8 L · V8 5,0 L · 4 cylindres à plat (boxer) – chaque piston, segment, soupape, clavette, coussinet et vis |
+| ⚙️ Moteurs (17) | Monocylindre 125 · Bicylindre en V · 3 cylindres turbo · 4 cylindres essence turbo · 4 cylindres moto · 5 cylindres (rare) · 6 cylindres diesel 12,8 L · V6 biturbo · V8 · V10 · V12 (rare) · Flat-4 boxer · Flat-6 · W16 (très rare) · Étoile 9 cylindres d'aviation (rare) · Rotatif Wankel birotor (rare) · Électrique synchrone 800 V (le plus récent) – chaque piston, segment, soupape, clavette, coussinet et vis, animés |
 | 🚗 Voitures | Citadine · Berline · Break · SUV 4×4 · Monospace 7 places · Coupé sportif · Pick-up double cabine · Électrique |
 | 🚐 Utilitaires | Fourgonnette · Fourgon L2H2 · Grand fourgon L4H3 propulsion à roues jumelées |
 | 🚚 Camions | Tracteur routier 4×2 · Tracteur 6×2 · Porteur benne 8×4 · Porteur fourgon 4×2 |

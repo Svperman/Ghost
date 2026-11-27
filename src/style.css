@@ -192,3 +192,5 @@ body.dragging #drop-hint { display: grid; }
 #cut-panel input { width: 160px; accent-color: var(--accent-2); }
 #cut-val { min-width: 110px; font-variant-numeric: tabular-nums; }
 #cut-panel[hidden], #anim-hud[hidden], #anim-speed[hidden], #t-anim[hidden] { display: none; }
+#dis-panel[hidden] { display: none !important; }
+#cut-panel { top: auto; bottom: 140px; }
