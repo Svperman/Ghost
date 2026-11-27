@@ -67,32 +67,34 @@
       <button id="cut-flip" title="Garder l'autre moitié">⇄ Inverser</button>
     </div>
     <div id="toolbar">
-      <label class="slider" title="Retirer les couches, de l'extérieur jusqu'au châssis (PgUp / PgDn)">🧅 <span id="layer-label">Tout</span>
-        <input id="layers" type="range" min="0" max="4" value="0" step="1" />
+      <label class="slider" title="Retirer les couches, de l'extérieur jusqu'au châssis (PgUp / PgDn)"><i>🧅</i><span class="lbl" id="layer-label">Tout</span>
+        <input id="layers" type="range" min="0" max="4" value="0" step="1" aria-label="Couches" />
       </label>
-      <label class="slider" title="Vue éclatée (E)">💥 Éclatement
-        <input id="explode" type="range" min="0" max="100" value="0" />
+      <label class="slider" title="Vue éclatée (E)"><i>💥</i><span class="lbl">Éclatement</span>
+        <input id="explode" type="range" min="0" max="100" value="0" aria-label="Éclatement" />
       </label>
-      <button class="toggle" id="t-anim" title="Animer le fonctionnement des pièces (P)">▶ Fonctionnement</button>
-      <select id="anim-speed" title="Vitesse de l'animation"><option value="0.25">Très lent</option><option value="1" selected>Lent</option><option value="3">Rapide</option></select>
-      <button class="toggle" id="t-cut" title="Coupe : trancher le modèle pour voir l'intérieur (K)">✂️ Coupe</button>
-      <button class="toggle" id="t-dis" title="Démontage pas à pas, de la carrosserie jusqu'au châssis (D)">🔧 Démonter</button>
-      <button class="toggle" id="t-xray" title="Rayons X : rend transparent tout sauf la sélection (X)">🩻 Rayons X</button>
-      <button class="toggle" id="t-wire" title="Affichage filaire (W)">🕸 Filaire</button>
-      <button class="toggle" id="t-dims" title="Cotes d'encombrement de la sélection (C)">📏 Cotes</button>
-      <button class="toggle" id="t-labels" title="Étiquettes des sous-ensembles (L)">🏷 Étiquettes</button>
-      <button class="toggle" id="t-measure" title="Mesurer une distance entre deux points (M)">📐 Mesurer</button>
+      <span class="sep"></span>
+      <button class="toggle" id="t-anim" title="Animer le fonctionnement des pièces (P)"><i>▶</i><span class="lbl">Fonctionnement</span></button>
+      <select id="anim-speed" title="Vitesse de l'animation" aria-label="Vitesse de l'animation"><option value="0.25">Très lent</option><option value="1" selected>Lent</option><option value="3">Rapide</option></select>
+      <button class="toggle" id="t-dis" title="Démontage pas à pas, de la carrosserie jusqu'au châssis (D)"><i>🔧</i><span class="lbl">Démonter</span></button>
+      <button class="toggle" id="t-cut" title="Coupe : trancher le modèle pour voir l'intérieur (K)"><i>✂️</i><span class="lbl">Coupe</span></button>
+      <button class="toggle" id="t-xray" title="Rayons X : rend transparent tout sauf la sélection (X)"><i>🩻</i><span class="lbl">Rayons X</span></button>
+      <button class="toggle" id="t-wire" title="Affichage filaire (W)"><i>🕸</i><span class="lbl">Filaire</span></button>
+      <button class="toggle" id="t-dims" title="Cotes d'encombrement de la sélection (C)"><i>📏</i><span class="lbl">Cotes</span></button>
+      <button class="toggle" id="t-labels" title="Étiquettes des sous-ensembles (L)"><i>🏷</i><span class="lbl">Étiquettes</span></button>
+      <button class="toggle" id="t-measure" title="Mesurer une distance entre deux points (M)"><i>📐</i><span class="lbl">Mesurer</span></button>
       <span class="sep"></span>
       <button id="v-iso" title="Vue 3/4">3/4</button>
       <button id="v-front" title="Vue de face">Face</button>
       <button id="v-side" title="Vue de côté">Côté</button>
       <button id="v-top" title="Vue de dessus">Dessus</button>
       <span class="sep"></span>
-      <button id="b-import" title="Importer un modèle 3D réel (.glb / .gltf) – ou glissez-déposez le fichier dans la vue">📦 Importer</button>
+      <button id="b-import" title="Importer un modèle 3D réel (.glb / .gltf) – ou glissez-déposez le fichier dans la vue"><i>📦</i><span class="lbl">Importer</span></button>
       <input id="file-import" type="file" accept=".glb,.gltf,model/gltf-binary,model/gltf+json" hidden />
-      <button id="b-shot" title="Capture d'écran PNG">📷</button>
-      <button id="b-csv" title="Exporter la nomenclature (CSV)">📄 Nomenclature</button>
+      <button id="b-shot" title="Capture d'écran PNG"><i>📷</i><span class="lbl">Capture</span></button>
+      <button id="b-csv" title="Exporter la nomenclature (CSV)"><i>📄</i><span class="lbl">Nomenclature</span></button>
       <button id="b-help" title="Aide (?)">?</button>
+      <button id="b-tools" title="Replier / déplier la barre d'outils (T)" aria-expanded="true"><i>⌄</i><span class="lbl">Replier</span></button>
     </div>
   </main>
 

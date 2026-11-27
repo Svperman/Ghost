@@ -56,11 +56,20 @@ input[type=search]:focus { outline: none; border-color: var(--accent); }
 #tooltip { position: absolute; pointer-events: none; background: rgba(15,18,22,.92); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; font-size: 12px; display: none; max-width: 340px; z-index: 3; }
 #tooltip .p { color: var(--muted); font-size: 11px; }
 #measure-hint { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: var(--accent-2); color: #000; padding: 5px 12px; border-radius: 6px; font-weight: 600; display: none; z-index: 3; }
-#toolbar { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px; padding: 8px; background: rgba(22,26,32,.92); border: 1px solid var(--line); border-radius: 10px; max-width: calc(100% - 20px); z-index: 3; }
-#toolbar button { font-size: 12.5px; padding: 5px 9px; }
+#toolbar { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 4px; padding: 5px 6px; background: rgba(22,26,32,.92); border: 1px solid var(--line); border-radius: 10px; width: max-content; max-width: calc(100% - 20px); z-index: 3; }
+#toolbar::-webkit-scrollbar { display: none; }
+#toolbar > * { flex: none; }
+#toolbar button { font-size: 12.5px; padding: 5px 8px; display: inline-flex; align-items: center; gap: 5px; }
+#toolbar i { font-style: normal; }
+#toolbar select { font: inherit; font-size: 12px; color: var(--text); background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 4px; }
+/* Barre compacte : icônes seules (le nom s'affiche au survol) ; libellés visibles sur grand écran */
+#toolbar .lbl { display: none; }
+@media (min-width: 1900px) { #toolbar .lbl { display: inline; } }
+#toolbar.collapsed > :not(#b-tools) { display: none; }
+#toolbar.collapsed { padding: 4px; }
 #toolbar .sep { width: 1px; height: 22px; background: var(--line); }
 .slider { display: flex; align-items: center; gap: 6px; font-size: 12.5px; }
-.slider input { width: 120px; accent-color: var(--accent); }
+.slider input { width: 90px; accent-color: var(--accent); }
 
 .lbl { background: rgba(15,18,22,.85); border: 1px solid var(--line); color: var(--text); font: 11px system-ui, sans-serif; padding: 2px 6px; border-radius: 4px; white-space: nowrap; pointer-events: auto; cursor: pointer; }
 .lbl:hover { border-color: var(--accent); }

@@ -829,7 +829,7 @@ function setAnimOn(v) {
   if (v && !anim.fn) return;
   anim.on = v;
   $('#t-anim').classList.toggle('on', v);
-  $('#t-anim').textContent = v ? '⏸ Pause' : '▶ Fonctionnement';
+  $('#t-anim').innerHTML = v ? '<i>⏸</i><span class="lbl">Pause</span>' : '<i>▶</i><span class="lbl">Fonctionnement</span>';
   $('#anim-hud').hidden = !v;
   if (v) { anim.last = performance.now(); }
   else if (!v && state.root) {
@@ -913,6 +913,7 @@ window.addEventListener('keydown', (ev) => {
   else if (k === 'm') toggle('measure');
   else if (k === 'e') animateExplode(state.explode > 0.01 ? 0 : 0.6);
   else if (k === 'd') dis.on ? stopDisassembly() : startDisassembly();
+  else if (k === 't') $('#b-tools').click();
   else if (k === 'p') setAnimOn(!anim.on);
   else if (k === 'k') setCutOn(!cut.on);
   else if (dis.on && (ev.key === 'ArrowRight' || ev.key === ' ')) { ev.preventDefault(); disStep(1); }
@@ -1066,6 +1067,16 @@ function renderDisPanel() {
   P.querySelector('[data-d="prev"]').disabled = !i;
   P.querySelector('[data-d="next"]').disabled = i >= n;
 }
+// Barre d'outils repliable (le choix est mémorisé dans ce navigateur)
+function setToolsCollapsed(c) {
+  $('#toolbar').classList.toggle('collapsed', c);
+  const b = $('#b-tools');
+  b.setAttribute('aria-expanded', String(!c));
+  b.innerHTML = c ? '<i>🛠</i><span class="lbl-on">Outils</span>' : '<i>⌄</i><span class="lbl">Replier</span>';
+  try { localStorage.setItem('ghost-tools-collapsed', c ? '1' : '0'); } catch { /* stockage indisponible */ }
+}
+$('#b-tools').onclick = () => setToolsCollapsed(!$('#toolbar').classList.contains('collapsed'));
+try { if (localStorage.getItem('ghost-tools-collapsed') === '1') setToolsCollapsed(true); } catch { /* stockage indisponible */ }
 $('#t-dis').onclick = () => (dis.on ? stopDisassembly() : startDisassembly());
 
 // ============================================================================ Boucle de rendu
