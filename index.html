@@ -10,6 +10,10 @@
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <!-- Application installable et utilisable hors connexion -->
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Ghost" />
 
   <!-- Aperçu sur les réseaux sociaux (Open Graph / X) -->
   <meta property="og:type" content="website" />
@@ -35,6 +39,7 @@
   <header id="topbar">
     <div class="brand"><span class="logo">◎</span> GHOST <small>Explorateur 3D de pièces</small></div>
     <nav id="vehicle-tabs" aria-label="Véhicules"></nav>
+    <button id="crash-btn" title="Crash test : simulation physique des chocs">💥 <span>Crash test</span></button>
     <select id="type-select" aria-label="Type de véhicule"></select>
     <div id="stats"></div>
   </header>
@@ -56,6 +61,7 @@
     <div id="loading">Construction du modèle…</div>
     <div id="drop-hint">Déposez votre fichier .glb ici</div>
     <div id="tooltip"></div>
+    <div id="net-status" role="status" aria-live="polite" hidden></div>
     <div id="measure-hint"></div>
     <section id="dis-panel" hidden aria-live="polite" aria-label="Démontage pas à pas"></section>
     <div id="anim-hud" hidden></div>

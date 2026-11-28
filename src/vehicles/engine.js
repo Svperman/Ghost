@@ -3,7 +3,8 @@
 // Chaque rangée de cylindres est construite dans son propre repère (axe des cylindres = +Y local),
 // tourné autour de l'axe du vilebrequin : 0° en ligne, ±45° pour un V8 à 90°, ±90° pour un moteur à plat.
 import * as THREE from 'three';
-import { Assembly, S } from '../core/builder.js';
+import { Assembly, S, boltCircle } from '../core/builder.js';
+import { buildWankel, buildElectric } from './engine-special.js';
 import { ENGINE_TYPES } from './meta/engine.js';
 
 const D2R = Math.PI / 180;
@@ -63,6 +64,8 @@ function hull(points) {
 
 export function buildEngine(type = 'essence4') {
   const P = ENGINE_TYPES[type] || ENGINE_TYPES.essence4;
+  if (P.kind === 'wankel') return buildWankel(P);
+  if (P.kind === 'electrique') return buildElectric(P);
   const { bore, stroke, rodL, pitch, n } = P;
   const dsl = P.diesel;
   const r = stroke / 2;
@@ -101,22 +104,29 @@ export function buildEngine(type = 'essence4') {
 
   // --- Rangées et cylindres ---
   let banks, cyls = [];
+  const PH = { 1: [0], 2: [0, 180], 3: [0, 240, 120], 4: [0, 180, 180, 0], 5: [0, 144, 216, 72, 288], 6: [0, 240, 120, 120, 240, 0] };
+  const inSideOf = (a) => (a < 0 ? 1 : -1);
   if (P.layout === 'I') {
     banks = [{ a: 0, name: 'Culasse & cylindres', key: '', inSide: -1 }];
-    const ph = n === 6 ? [0, 240, 120, 120, 240, 0] : n === 3 ? [0, 240, 120] : [0, 180, 180, 0];
-    for (let i = 0; i < n; i++) cyls.push({ no: i + 1, b: 0, x: (i - (n - 1) / 2) * pitch, phi: ph[i] + theta0, throw: i });
-  } else if (P.layout === 'V') {
-    const A = P.angle / 2, m = n / 2;
-    banks = [{ a: A, name: 'Rangée droite (cylindres 1 à 4)', key: 'D', inSide: -1 }, { a: -A, name: 'Rangée gauche (cylindres 5 à 8)', key: 'G', inSide: 1 }];
-    const ph = [0, 90, 270, 180];
-    for (let b = 0; b < 2; b++) for (let j = 0; j < m; j++) cyls.push({ no: b * m + j + 1, b, x: (j - (m - 1) / 2) * pitch + (b ? 1 : -1) * (rodW / 2 + 1), phi: ph[j] + theta0, throw: j });
-  } else {
+    for (let i = 0; i < n; i++) cyls.push({ no: i + 1, b: 0, x: (i - (n - 1) / 2) * pitch, phi: PH[n][i] + theta0, throw: i });
+  } else if (P.layout === 'V' || P.layout === 'W') {
+    const A = P.angle / 2, nb = P.layout === 'W' ? 4 : 2, m = n / nb, w = (P.vr || 0) / 2;
+    const ang = nb === 4 ? [A + w, A - w, -A + w, -A - w] : [A, -A];
+    const nm = nb === 4 ? ['Rangée 1 (droite extérieure)', 'Rangée 2 (droite intérieure)', 'Rangée 3 (gauche intérieure)', 'Rangée 4 (gauche extérieure)'] : ['Rangée droite', 'Rangée gauche'];
+    banks = ang.map((a, b) => ({ a, name: `${nm[b]} – cylindres ${b * m + 1}${m > 1 ? ` à ${b * m + m}` : ''}`, key: nb === 4 ? String(b + 1) : (b ? 'G' : 'D'), inSide: inSideOf(a) }));
+    const ph = n === 8 ? [0, 90, 270, 180] : PH[m];
+    for (let b = 0; b < nb; b++) for (let j = 0; j < m; j++) cyls.push({ no: b * m + j + 1, b, x: (j - (m - 1) / 2) * pitch + (b - (nb - 1) / 2) * (rodW + 1), phi: ph[j] + theta0, throw: j });
+  } else if (P.layout === 'B') {
     const m = n / 2;
     banks = [{ a: 90, name: 'Rangée droite', key: 'D', inSide: -1 }, { a: -90, name: 'Rangée gauche', key: 'G', inSide: 1 }];
     for (let b = 0; b < 2; b++) for (let j = 0; j < m; j++) {
       const a = banks[b].a;
-      cyls.push({ no: j * 2 + b + 1, b, x: (j - (m - 1) / 2) * pitch + (b ? 1 : -1) * pitch * 0.25, phi: a + (j % 2) * 180 + theta0, throw: j * 2 + b });
+      cyls.push({ no: j * 2 + b + 1, b, x: (j - (m - 1) / 2) * pitch + (b ? 1 : -1) * pitch * 0.25, phi: a + PH[m][j] + theta0, throw: j * 2 + b });
     }
+  } else {
+    // moteur en étoile : un seul maneton, une bielle maîtresse et des biellettes articulées
+    banks = Array.from({ length: n }, (_, k) => ({ a: (k * 360) / n, name: `Cylindre n°${k + 1} (étoile, ${Math.round((k * 360) / n)}°)`, key: `C${k + 1}`, inSide: -1 }));
+    for (let k = 0; k < n; k++) cyls.push({ no: k + 1, b: k, x: 0, phi: theta0, throw: 0 });
   }
   // manetons du vilebrequin
   const throwMap = new Map();
@@ -125,7 +135,7 @@ export function buildEngine(type = 'essence4') {
     t.cyls.push(c);
     throwMap.set(c.throw, t);
   }
-  const throws = [...throwMap.values()].map((t) => ({ ...t, x: t.cyls.reduce((s, c) => s + c.x, 0) / t.cyls.length, w: t.cyls.length * (rodW + 1) + 1 })).sort((a, b) => a.x - b.x);
+  const throws = [...throwMap.values()].map((t) => ({ ...t, x: t.cyls.reduce((s, c) => s + c.x, 0) / t.cyls.length, w: P.layout === 'R' ? rodW + 2 : t.cyls.length * (rodW + 1) + 1 })).sort((a, b) => a.x - b.x);
   const xMin = Math.min(...cyls.map((c) => c.x)) - pitch / 2 - 10, xMax = Math.max(...cyls.map((c) => c.x)) + pitch / 2 + 10;
   const xF = xMin - 20, xR = xMax + 20;          // faces avant (distribution) et arrière (volant)
 
@@ -137,24 +147,28 @@ export function buildEngine(type = 'essence4') {
   const blk = eng.group('Bloc-cylindres', { code: 'BLC', layer: 'struct', desc: P.block === 'fonte' ? 'Fonte à graphite vermiculaire (GJV)' : 'Aluminium AlSi9Cu3 coulé sous pression – chemises en fonte' });
   const bMat = P.block === 'fonte' ? 'fonte' : 'aluminium';
   const L = xMax - xMin;
-  if (P.layout === 'I') {
+  if (P.layout === 'R') {
+    blk.part('Carter moteur en étoile (deux demi-carters)', S.cyl(deck * 1.05, L, 'x', 9), { pos: [(xMin + xMax) / 2, Yc, 0], mat: bMat });
+    for (const sd of [-1, 1]) boltCircle(blk, { n: 18, pcd: deck * 0.95, d: 10, L: 40, axis: 'x', at: [sd * L / 2, Yc, 0], dir: sd, label: `Goujon de demi-carter ${sd < 0 ? 'avant' : 'arrière'}`, kind: 'nut', couple: 40 });
+  } else if (P.layout === 'I') {
     blk.part('Carter-cylindres (fonderie)', S.box(L, deck + mainD * 0.15, headW), { pos: [(xMin + xMax) / 2, Yc + (deck - mainD * 0.15) / 2, 0], mat: bMat });
   } else {
     const ch2 = P.layout === 'V' ? bore * 0.9 : bore * 0.7;
     blk.part('Carter de vilebrequin central (fonderie)', S.box(L, ch2 + mainD * 0.15, P.layout === 'V' ? bore * 1.5 : bore * 1.3), { pos: [(xMin + xMax) / 2, Yc + (ch2 - mainD * 0.15) / 2, 0], mat: bMat });
-    for (let b = 0; b < banks.length; b++) {
+    for (let b = 0; b < banks.length && P.layout !== 'R'; b++) {
       const bc = cyls.filter((c) => c.b === b), bx0 = Math.min(...bc.map((c) => c.x)) - pitch / 2, bx1 = Math.max(...bc.map((c) => c.x)) + pitch / 2;
       const y0 = deck * 0.42;
       bankGroups[b].part('Fût de rangée (fonderie)', S.box(bx1 - bx0, deck - y0, headW), { pos: [(bx0 + bx1) / 2, (deck + y0) / 2, 0], mat: bMat });
     }
-    if (P.layout === 'V') blk.part('Couvercle de vallée (V)', S.box(L - 40, 6, bore * 0.9), { pos: [(xMin + xMax) / 2, Yc + bore * 1.05, 0], mat: 'aluminium', layer: 'ext' });
+    if (P.layout === 'V' || P.layout === 'W') blk.part('Couvercle de vallée (V)', S.box(L - 40, 6, bore * 0.9), { pos: [(xMin + xMax) / 2, Yc + bore * 1.05, 0], mat: 'aluminium', layer: 'ext' });
   }
-  blk.part('Carter inférieur (bedplate / échelle de paliers)', S.box(L, cwR + 15 - mainD * 0.15, P.layout === 'I' ? headW : bore * 1.4), { pos: [(xMin + xMax) / 2, Yc - mainD * 0.15 - (cwR + 15 - mainD * 0.15) / 2, 0], mat: bMat, desc: 'Rigidifie les paliers de vilebrequin' });
+  if (P.layout !== 'R') blk.part('Carter inférieur (bedplate / échelle de paliers)', S.box(L, cwR + 15 - mainD * 0.15, P.layout === 'I' ? headW : bore * 1.4), { pos: [(xMin + xMax) / 2, Yc - mainD * 0.15 - (cwR + 15 - mainD * 0.15) / 2, 0], mat: bMat, desc: 'Rigidifie les paliers de vilebrequin' });
   for (const c of cyls) {
     bankGroups[c.b].part(`Chemise du cylindre n°${c.no}`, S.tube(bore + 6, bore, stroke + pistonH * 0.9, 'y', 48), { pos: [c.x, deck - (stroke + pistonH * 0.9) / 2, 0], mat: 'fonte', desc: `Alésage ${bore} mm (tolérance H7 : +0 / +0,030 mm) – rodage plateau, rugosité Rz 3 à 5 µm` });
-    bankGroups[c.b].part(`Gicleur de fond de piston n°${c.no}`, S.pipe([[c.x - bore * 0.3, deck - stroke - pistonH - 15, bore * 0.45], [c.x - bore * 0.25, deck - stroke - pistonH + 10, bore * 0.32], [c.x - bore * 0.15, deck - stroke - pistonH + 20, bore * 0.2]], 5), { mat: 'acier', desc: 'Refroidit le dessous du piston par jet d\'huile' });
+    if (P.air) for (let f = 0; f < 10; f++) bankGroups[c.b].part(`Ailette de refroidissement du cylindre ${c.no} n°${f + 1}`, S.tube(bore * 1.45, bore + 6, 3, 'y', 48), { pos: [c.x, deck * 0.55 + f * (deck * 0.42) / 10, 0], mat: 'aluminium', color: 0x6b6f75, desc: 'Refroidissement par air – ailettes usinées' });
+    if (!P.air) bankGroups[c.b].part(`Gicleur de fond de piston n°${c.no}`, S.pipe([[c.x - bore * 0.3, deck - stroke - pistonH - 15, bore * 0.45], [c.x - bore * 0.25, deck - stroke - pistonH + 10, bore * 0.32], [c.x - bore * 0.15, deck - stroke - pistonH + 20, bore * 0.2]], 5), { mat: 'acier', desc: 'Refroidit le dessous du piston par jet d\'huile' });
   }
-  blk.part('Bouchon de noyau (pastille de dessablage)', S.cyl(32, 6, 'z'), { pos: [0, Yc + deck * 0.55, (P.layout === 'I' ? headW : bore * 1.5) / 2 + 1], mat: 'laiton' });
+  if (P.layout !== 'R') blk.part('Bouchon de noyau (pastille de dessablage)', S.cyl(32, 6, 'z'), { pos: [0, Yc + deck * 0.55, (P.layout === 'I' ? headW : bore * 1.5) / 2 + 1], mat: 'laiton' });
   blk.part('Capteur de cliquetis', S.cyl(26, 22, 'z'), { pos: [0, Yc + deck * 0.4, -((P.layout === 'I' ? headW : bore * 1.5) / 2 + 11)], mat: 'plastique', layer: 'int', desc: 'Capteur piézoélectrique – vis M8, couple 20 N·m' });
 
   // ======================================================================= Vilebrequin & paliers
@@ -364,18 +378,23 @@ export function buildEngine(type = 'essence4') {
   const rc = r1(bore * 0.27);
   const xd = xF - 15;
   AN.spin.push({ k: 1, C: V3(0, Yc, 0), o: dis.part('Pignon de vilebrequin', S.cyl(rc * 2, 20, 'x', 48), { pos: [xd, Yc, 0], mat: 'acierHR' }) });
-  const sprockets = [[0, Yc, rc]];
-  banks.forEach((bk, b) => { for (const side of [-1, 1]) { const w = toWorld(b, V3(0, camY, side * vz)); sprockets.push([w.z, w.y, bore * 0.575]); } });
-  const hp = [];
-  for (const [z0, y0, rr] of sprockets) for (let i = 0; i < 24; i++) { const a = (i / 24) * Math.PI * 2; hp.push([z0 + (rr + 4) * Math.cos(a), y0 + (rr + 4) * Math.sin(a)]); }
-  const H = hull(hp);
-  dis.part('Chaîne de distribution', S.pipe(H.filter((_, i) => i % 2 === 0).map(([z, y]) => [xd - 30, y, z]), 8, true), { mat: 'acier', desc: `${Math.round(H.length * 3)} maillons environ – allongement maxi 0,5 %` });
-  const zr = Math.max(...H.map((p) => p[0])), zl = Math.min(...H.map((p) => p[0]));
-  dis.part('Tendeur hydraulique de chaîne', S.cyl(30, 70, 'z'), { pos: [xd - 30, Yc + deck * 0.55, zr + 30], mat: 'aluminium' });
-  dis.part('Patin tendeur', S.box(18, deck * 0.7, 16), { pos: [xd - 30, Yc + deck * 0.55, zr + 6], mat: 'plastique', color: 0x2a2c30 });
-  dis.part('Guide de chaîne fixe', S.box(18, deck * 0.7, 16), { pos: [xd - 30, Yc + deck * 0.55, zl - 6], mat: 'plastique', color: 0x2a2c30 });
-  const yMaxD = Math.max(...H.map((p) => p[1])), yMinD = Math.min(...H.map((p) => p[1]));
-  dis.part('Carter de distribution', S.box(8, yMaxD - yMinD + 60, zr - zl + 80), { pos: [xd - 65, (yMaxD + yMinD) / 2, (zr + zl) / 2], mat: 'aluminium', layer: 'ext' });
+  if (P.layout === 'R') {
+    dis.part('Plateau à cames (came annulaire à 4 bossages)', ringX(deck * 0.42, deck * 0.3, 0, 360, 18), { pos: [xd, Yc, 0], mat: 'acierForge', desc: 'Tourne à 1/8 de la vitesse du vilebrequin et commande les 18 culbuteurs par tiges' });
+    for (const c of cyls) for (const k of [-1, 1]) { const a = (banks[c.b].a) * D2R; dis.part(`Tige de culbuteur cyl.${c.no} ${k < 0 ? 'admission' : 'échappement'}`, S.rod([xd + k * 25, Yc + Math.cos(a) * deck * 0.42, Math.sin(a) * deck * 0.42], [xd + k * 25 + 20, Yc + Math.cos(a) * (camY + 10), Math.sin(a) * (camY + 10)], 12), { mat: 'acier' }); }
+  } else {
+    const sprockets = [[0, Yc, rc]];
+    banks.forEach((bk, b) => { for (const side of [-1, 1]) { const w = toWorld(b, V3(0, camY, side * vz)); sprockets.push([w.z, w.y, bore * 0.575]); } });
+    const hp = [];
+    for (const [z0, y0, rr] of sprockets) for (let i = 0; i < 24; i++) { const a = (i / 24) * Math.PI * 2; hp.push([z0 + (rr + 4) * Math.cos(a), y0 + (rr + 4) * Math.sin(a)]); }
+    const H = hull(hp);
+    dis.part('Chaîne de distribution', S.pipe(H.filter((_, i) => i % 2 === 0).map(([z, y]) => [xd - 30, y, z]), 8, true), { mat: 'acier', desc: `${Math.round(H.length * 3)} maillons environ – allongement maxi 0,5 %` });
+    const zr = Math.max(...H.map((p) => p[0])), zl = Math.min(...H.map((p) => p[0]));
+    dis.part('Tendeur hydraulique de chaîne', S.cyl(30, 70, 'z'), { pos: [xd - 30, Yc + deck * 0.55, zr + 30], mat: 'aluminium' });
+    dis.part('Patin tendeur', S.box(18, deck * 0.7, 16), { pos: [xd - 30, Yc + deck * 0.55, zr + 6], mat: 'plastique', color: 0x2a2c30 });
+    dis.part('Guide de chaîne fixe', S.box(18, deck * 0.7, 16), { pos: [xd - 30, Yc + deck * 0.55, zl - 6], mat: 'plastique', color: 0x2a2c30 });
+    const yMaxD = Math.max(...H.map((p) => p[1])), yMinD = Math.min(...H.map((p) => p[1]));
+    dis.part('Carter de distribution', S.box(8, yMaxD - yMinD + 60, zr - zl + 80), { pos: [xd - 65, (yMaxD + yMinD) / 2, (zr + zl) / 2], mat: 'aluminium', layer: 'ext' });
+  }
   dis.part('Joint spi de vilebrequin avant', ringX(mainD * 0.35 + 9, mainD * 0.35, 0, 360, 8), { pos: [xd - 65, Yc, 0], mat: 'fkm', layer: 'ext' });
   AN.spin.push({ k: 1, C: V3(0, Yc, 0), o: dis.part('Poulie d\'amortisseur de vilebrequin (damper)', S.cyl(bore * 1.9, 32, 'x', 64), { pos: [xd - 95, Yc, 0], mat: 'fonte', layer: 'int', desc: 'Amortisseur de vibrations de torsion – masse sur élastomère' }) });
   dis.part('Vis de poulie de vilebrequin', orient(S.bolt(dsl ? 20 : 14, 60), V3(-1, 0, 0), V3(xd - 112, Yc, 0)), { mat: 'acierHR', couple: dsl ? '300 N·m + 90°' : '100 N·m + 180°', layer: 'int' });
@@ -392,50 +411,61 @@ export function buildEngine(type = 'essence4') {
   vo.part('Cible du capteur de vilebrequin (60−2 dents)', ringX(fwD / 2 - 15, fwD / 2 - 30, 0, 348, 4), { pos: [xv - 22, Yc, 0], mat: 'acier' });
   eng.part('Capteur de position de vilebrequin (PMH)', S.cyl(16, 45, 'y'), { pos: [xv - 22, Yc + fwD / 2 - 10 + 22, 0], mat: 'plastique', layer: 'int', desc: 'Capteur inductif à effet Hall – entrefer 0,5 à 1,5 mm' });
 
+  if (P.layout === 'R') {
+    const he = eng.group('Hélice tripale à pas variable', { code: 'HEL', layer: 'ext' });
+    AN.crank.push(he.object);
+    he.part('Moyeu d\'hélice', S.cyl(360, 300, 'x', 32), { pos: [xF - 220, Yc, 0], mat: 'aluminium' });
+    he.part('Cône d\'hélice', S.cone(380, 450, 'x', 32), { pos: [xF - 600, Yc, 0], rot: [0, 0, 180], mat: 'peintureAlu', color: 0xc0262d });
+    for (let k = 0; k < 3; k++) { const a = (k / 3) * Math.PI * 2; he.part(`Pale d'hélice ${k + 1}`, S.box(60, 1750, 230), { pos: [xF - 220, Yc + Math.cos(a) * 1000, Math.sin(a) * 1000], rot: [-a / D2R, 15, 0], mat: 'aluminium', desc: 'Pale en alliage léger – Ø hélice 3,6 m' }); }
+  }
+
   // ======================================================================= Lubrification
   const lub = eng.group('Lubrification', { code: 'LUB', layer: 'ext' });
   const sumpTop = Yc - cwR - 15;
   const sW = P.layout === 'I' ? headW : bore * 1.4;
-  lub.part('Carter d\'huile', S.box(L - 20, sumpD, sW - 10), { pos: [(xMin + xMax) / 2, sumpTop - sumpD / 2, 0], mat: dsl ? 'acier' : 'aluminium', desc: `Capacité ≈ ${dsl ? 38 : P.n * 1.1} L avec filtre` });
-  lub.part('Joint de carter d\'huile', S.box(L - 26, 2, sW - 16), { pos: [(xMin + xMax) / 2, sumpTop - 1, 0], mat: 'fkm' });
+  if (P.layout !== 'R') lub.part('Carter d\'huile', S.box(L - 20, sumpD, sW - 10), { pos: [(xMin + xMax) / 2, sumpTop - sumpD / 2, 0], mat: dsl ? 'acier' : 'aluminium', desc: `Capacité ≈ ${dsl ? 38 : P.n * 1.1} L avec filtre` });
+  if (P.layout !== 'R') lub.part('Joint de carter d\'huile', S.box(L - 26, 2, sW - 16), { pos: [(xMin + xMax) / 2, sumpTop - 1, 0], mat: 'fkm' });
   const nsv = Math.max(5, Math.round(L / 80));
-  for (let k = 0; k < nsv; k++) for (const sd of [-1, 1]) lub.part(`Vis de carter d'huile ${sd < 0 ? 'A' : 'B'}${k + 1}`, orient(S.capScrew(6, 20), V3(0, -1, 0), V3(xMin + 20 + k * (L - 40) / (nsv - 1), sumpTop - 8, sd * (sW / 2 - 12))), { mat: 'zingue', couple: '10 N·m' });
-  lub.part('Bouchon de vidange', orient(S.bolt(14, 14), V3(0, -1, 0), V3(xMax - 80, sumpTop - sumpD - 1, 0)), { mat: 'acier', couple: '25 N·m' });
-  lub.part('Joint de bouchon de vidange', S.tube(22, 14.2, 2, 'y'), { pos: [xMax - 80, sumpTop - sumpD - 1, 0], mat: 'cuivre' });
+  if (P.layout !== 'R') for (let k = 0; k < nsv; k++) for (const sd of [-1, 1]) lub.part(`Vis de carter d'huile ${sd < 0 ? 'A' : 'B'}${k + 1}`, orient(S.capScrew(6, 20), V3(0, -1, 0), V3(xMin + 20 + k * (L - 40) / (nsv - 1), sumpTop - 8, sd * (sW / 2 - 12))), { mat: 'zingue', couple: '10 N·m' });
+  if (P.layout !== 'R') lub.part('Bouchon de vidange', orient(S.bolt(14, 14), V3(0, -1, 0), V3(xMax - 80, sumpTop - sumpD - 1, 0)), { mat: 'acier', couple: '25 N·m' });
+  if (P.layout !== 'R') lub.part('Joint de bouchon de vidange', S.tube(22, 14.2, 2, 'y'), { pos: [xMax - 80, sumpTop - sumpD - 1, 0], mat: 'cuivre' });
   const pm = lub.group('Pompe à huile à rotors', { code: 'LUB', layer: 'meca', desc: 'Pompe à cylindrée variable – pression 1,5 à 5 bar' });
   const pz = 0, py = Yc - cwR + 10;
   pm.part('Corps de pompe à huile', S.cyl(bore * 1.1, 30, 'x', 48), { pos: [xd - 20, py, pz], mat: 'aluminium' });
   pm.part('Rotor extérieur (5 lobes)', ringX(bore * 0.45, bore * 0.32, 0, 360, 14), { pos: [xd - 20, py, pz], mat: 'acierHR' });
   pm.part('Rotor intérieur (4 lobes)', S.cyl(bore * 0.5, 14, 'x', 4), { pos: [xd - 20, py, pz + 3], mat: 'acierHR' });
   pm.part('Clapet de décharge', S.cyl(10, 40, 'z'), { pos: [xd - 20, py - 20, pz + bore * 0.4], mat: 'acier' });
-  lub.part('Crépine d\'aspiration', S.pipe([[xd - 20, py, 0], [xd + 30, py - 30, 0], [xd + 100, sumpTop - sumpD + 25, 0]], 18), { mat: 'acier', layer: 'meca' });
-  lub.part('Tamis de crépine', S.cyl(70, 8, 'y'), { pos: [xd + 100, sumpTop - sumpD + 20, 0], mat: 'inox', layer: 'meca' });
+  if (P.layout !== 'R') lub.part('Crépine d\'aspiration', S.pipe([[xd - 20, py, 0], [xd + 30, py - 30, 0], [xd + 100, sumpTop - sumpD + 25, 0]], 18), { mat: 'acier', layer: 'meca' });
+  if (P.layout !== 'R') lub.part('Tamis de crépine', S.cyl(70, 8, 'y'), { pos: [xd + 100, sumpTop - sumpD + 20, 0], mat: 'inox', layer: 'meca' });
   const fz = -(sW / 2 + 45);
   lub.part('Filtre à huile (cartouche)', S.cyl(dsl ? 110 : 76, dsl ? 260 : 100, 'z', 32), { pos: [(xMin + xMax) / 2 - bore * 0.5, Yc + 10, fz - (dsl ? 100 : 20)], mat: 'peinture', color: 0x1f4fa0, layer: 'int' });
   lub.part('Support de filtre & échangeur huile / eau', S.box(bore * 1.1, bore, 40), { pos: [(xMin + xMax) / 2 - bore * 0.5, Yc + 10, -(sW / 2 + 20)], mat: 'aluminium', layer: 'int' });
   lub.part('Mano-contact de pression d\'huile', S.cyl(20, 35, 'z'), { pos: [(xMin + xMax) / 2 + bore * 0.5, Yc + 30, -(sW / 2 + 18)], mat: 'laiton', layer: 'int' });
-  lub.part('Tube de jauge à huile', S.pipe([[xMin + 60, sumpTop - 20, sW / 2 - 15], [xMin + 60, Yc + deck * 0.5, sW / 2 + 20], [xMin + 50, Yc + deck + 40, sW / 2 + 20]], 12), { mat: 'acier', layer: 'int' });
-  lub.part('Jauge à huile (poignée)', S.box(30, 15, 20), { pos: [xMin + 50, Yc + deck + 50, sW / 2 + 20], mat: 'plastique', color: 0xd4a017, layer: 'int' });
+  if (P.layout !== 'R') lub.part('Tube de jauge à huile', S.pipe([[xMin + 60, sumpTop - 20, sW / 2 - 15], [xMin + 60, Yc + deck * 0.5, sW / 2 + 20], [xMin + 50, Yc + deck + 40, sW / 2 + 20]], 12), { mat: 'acier', layer: 'int' });
+  if (P.layout !== 'R') lub.part('Jauge à huile (poignée)', S.box(30, 15, 20), { pos: [xMin + 50, Yc + deck + 50, sW / 2 + 20], mat: 'plastique', color: 0xd4a017, layer: 'int' });
 
   // ======================================================================= Refroidissement
-  const ref = eng.group('Refroidissement', { code: 'REF', layer: 'int' });
   const wpY = Yc + deck * 0.45, wpZ = P.layout === 'I' ? bore * 0.45 : 0;
-  ref.part('Corps de pompe à eau', S.cyl(bore * 1.15, 40, 'x', 40), { pos: [xd - 60, wpY, wpZ], mat: 'aluminium' });
-  AN.spin.push({ k: 1.3, C: V3(0, wpY, wpZ), o: ref.part('Moyeu de turbine de pompe à eau', S.cyl(30, 25, 'x'), { pos: [xd - 40, wpY, wpZ], mat: 'acier' }) });
-  for (let i = 0; i < 7; i++) {
-    const a = (i / 7) * Math.PI * 2;
-    AN.spin.push({ k: 1.3, C: V3(0, wpY, wpZ), o: ref.part(`Aube de turbine de pompe à eau ${i + 1}`, S.box(18, bore * 0.3, 2.5), { pos: [xd - 40, wpY + Math.cos(a) * bore * 0.25, wpZ + Math.sin(a) * bore * 0.25], rot: [-a / D2R, 0, 0], mat: 'acier' }) });
+  if (!P.air) {
+    const ref = eng.group('Refroidissement', { code: 'REF', layer: 'int' });
+    ref.part('Corps de pompe à eau', S.cyl(bore * 1.15, 40, 'x', 40), { pos: [xd - 60, wpY, wpZ], mat: 'aluminium' });
+    AN.spin.push({ k: 1.3, C: V3(0, wpY, wpZ), o: ref.part('Moyeu de turbine de pompe à eau', S.cyl(30, 25, 'x'), { pos: [xd - 40, wpY, wpZ], mat: 'acier' }) });
+    for (let i = 0; i < 7; i++) {
+      const a = (i / 7) * Math.PI * 2;
+      AN.spin.push({ k: 1.3, C: V3(0, wpY, wpZ), o: ref.part(`Aube de turbine de pompe à eau ${i + 1}`, S.box(18, bore * 0.3, 2.5), { pos: [xd - 40, wpY + Math.cos(a) * bore * 0.25, wpZ + Math.sin(a) * bore * 0.25], rot: [-a / D2R, 0, 0], mat: 'acier' }) });
+    }
+    ref.part('Poulie de pompe à eau', S.cyl(bore * 0.9, 25, 'x'), { pos: [xd - 95, wpY, wpZ], mat: 'acier' });
+    ref.part('Boîtier de thermostat', S.box(70, 60, 70), { pos: [xR - 60, Yc + deck + 30, P.layout === 'I' ? -headW / 2 - 20 : 0], mat: 'composite', color: 0x2a2c30 });
+    ref.part('Thermostat à cire (ouverture 90 °C)', S.cyl(52, 40, 'z'), { pos: [xR - 60, Yc + deck + 30, P.layout === 'I' ? -headW / 2 - 50 : 40], mat: 'laiton' });
+    ref.part('Sonde de température de liquide', S.cyl(14, 35, 'y'), { pos: [xR - 20, Yc + deck + 70, P.layout === 'I' ? -headW / 2 - 20 : 0], mat: 'laiton' });
   }
-  ref.part('Poulie de pompe à eau', S.cyl(bore * 0.9, 25, 'x'), { pos: [xd - 95, wpY, wpZ], mat: 'acier' });
-  ref.part('Boîtier de thermostat', S.box(70, 60, 70), { pos: [xR - 60, Yc + deck + 30, P.layout === 'I' ? -headW / 2 - 20 : 0], mat: 'composite', color: 0x2a2c30 });
-  ref.part('Thermostat à cire (ouverture 90 °C)', S.cyl(52, 40, 'z'), { pos: [xR - 60, Yc + deck + 30, P.layout === 'I' ? -headW / 2 - 50 : 40], mat: 'laiton' });
-  ref.part('Sonde de température de liquide', S.cyl(14, 35, 'y'), { pos: [xR - 20, Yc + deck + 70, P.layout === 'I' ? -headW / 2 - 20 : 0], mat: 'laiton' });
 
   // ======================================================================= Admission & injection
   const adm = eng.group('Admission & alimentation', { code: 'ADM', layer: 'int' });
   const portY = headFace + (camY - headFace) * 0.35;
   let plenum;
-  if (P.layout === 'V') plenum = V3((xMin + xMax) / 2, Yc + deck * 1.15, 0);
+  if (P.layout === 'V' || P.layout === 'W') plenum = V3((xMin + xMax) / 2, Yc + deck * 1.15, 0);
+  else if (P.layout === 'R') plenum = V3(xMax + bore * 0.8, Yc, 0);
   else if (P.layout === 'B') plenum = V3((xMin + xMax) / 2, Yc + bore * 1.6, 0);
   else plenum = toWorld(0, V3(0, portY + bore * 0.3, banks[0].inSide * (headW / 2 + bore * 1.0)));
   adm.part('Répartiteur d\'admission (plénum)', S.box(L * 0.9, bore * 0.9, bore * 0.9), { pos: plenum.toArray(), mat: dsl ? 'aluminium' : 'composite', color: dsl ? undefined : 0x2a2c30 });
@@ -518,20 +548,20 @@ export function buildEngine(type = 'essence4') {
   // ======================================================================= Cinématique
   // Calage : PMH d'allumage de chaque cylindre réparti sur 720° selon l'ordre d'allumage
   const order = P.firing.split('-').map(Number);
-  for (const A of AN.cyl) {
-    const tdc = ((-A.rel0 / D2R) % 360 + 360) % 360;
-    const target = order.indexOf(A.c.no) * 720 / n;
-    const cand = [tdc, tdc + 360];
-    const dist = (a) => Math.min(Math.abs(a - target), 720 - Math.abs(a - target));
-    A.fire = dist(cand[0]) <= dist(cand[1]) ? cand[0] : cand[1];
+  // Chaque cylindre s'allume à l'un de ses deux PMH (tous les 720°) : on choisit la combinaison
+  // la plus régulière (écart minimal entre deux allumages le plus grand possible).
+  const tdcs = AN.cyl.map((A) => ((-A.rel0 / D2R) % 360 + 360) % 360);
+  let best = null, bestGap = -1, bestDev = Infinity;
+  for (let mask = 0; mask < 1 << AN.cyl.length; mask++) {
+    const f = tdcs.map((t, i) => t + ((mask >> i) & 1) * 360);
+    const sorted = f.slice().sort((a, b) => a - b);
+    let gap = sorted.length > 1 ? 720 - sorted[sorted.length - 1] + sorted[0] : 720;
+    for (let i = 1; i < sorted.length; i++) gap = Math.min(gap, sorted[i] - sorted[i - 1]);
+    gap = Math.round(gap);
+    const dev = AN.cyl.reduce((acc, A, i) => acc + Math.abs(((f[i] - order.indexOf(A.c.no) * 720 / n) % 720 + 1080) % 720 - 360), 0);
+    if (gap > bestGap || (gap === bestGap && dev < bestDev)) { best = f; bestGap = gap; bestDev = dev; }
   }
-  // deux cylindres ne peuvent pas s'allumer au même instant : le second passe au tour suivant
-  const seen = new Map();
-  for (const A of AN.cyl.slice().sort((a, b) => order.indexOf(a.c.no) - order.indexOf(b.c.no))) {
-    const key = Math.round(A.fire) % 720;
-    if (seen.has(key)) A.fire = (A.fire + 360) % 720;
-    seen.set(Math.round(A.fire) % 720, true);
-  }
+  AN.cyl.forEach((A, i) => { A.fire = best[i]; });
   const fireOf = new Map(AN.cyl.map((A) => [A.c.no, A.fire]));
   const cycOf = (no, deg) => (((deg - fireOf.get(no)) % 720) + 720) % 720;
   const bump = (x, a, b) => (x > a && x < b ? Math.sin(Math.PI * (x - a) / (b - a)) : 0);
@@ -567,10 +597,10 @@ export function buildEngine(type = 'essence4') {
       rotAbout(VA.lobe, VA.pivot, (nose - VA.lobeAng) * D2R);
     }
   };
-  const PH = [[180, 'Combustion – détente', '#ff6a3d'], [360, 'Échappement', '#9aa0a6'], [540, 'Admission', '#3d8bff'], [720, 'Compression', '#ffb020']];
+  const PHS = [[180, 'Combustion – détente', '#ff6a3d'], [360, 'Échappement', '#9aa0a6'], [540, 'Admission', '#3d8bff'], [720, 'Compression', '#ffb020']];
   eng.object.userData.phases = (deg) => cyls.slice().sort((a, b) => a.no - b.no).map((c) => {
     const cyc = cycOf(c.no, deg);
-    const ph = PH.find((p) => cyc < p[0]);
+    const ph = PHS.find((p) => cyc < p[0]);
     return { label: `Cyl. ${c.no}`, value: ph[1], color: ph[2] };
   });
   eng.object.userData.animTitle = (deg) => `Vilebrequin : ${Math.round(deg % 360)}° · cycle : ${Math.round(deg % 720)}° / 720°`;

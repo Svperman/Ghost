@@ -6,6 +6,8 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import './style.css';
 import { inject } from '@vercel/analytics';
 import { CATALOG, DEFAULT_TYPE } from './catalog.js';
+import { createCrashLab } from './crash.js';
+import './offline/status.js';
 import { LAYERS } from './core/builder.js';
 
 const LAYER_STEPS = ['Tout afficher', 'Sans carrosserie', 'Sans intérieur', 'Sans mécanique', 'Châssis seul'];
@@ -96,8 +98,9 @@ const explodeT = () => state.explode * 1.4;
 // ============================================================================ Chargement d'un véhicule
 function parseHash() {
   const [c, t] = location.hash.slice(1).split('/');
-  const cat = CATALOG[c] ? c : 'voiture';
-  const type = CATALOG[cat].types[t] ? t : firstType(cat);
+  // Object.hasOwn : « #constructor » ou « #voiture/toString » ne doivent pas passer pour des véhicules
+  const cat = Object.hasOwn(CATALOG, c) ? c : 'voiture';
+  const type = Object.hasOwn(CATALOG[cat].types, t) ? t : firstType(cat);
   return [cat, type];
 }
 function fillTypeSelect(cat, type) {
@@ -111,7 +114,7 @@ function renderTabs() {
     .filter(([, c]) => !c.hidden || Object.keys(c.types).length)
     .map(([k, c]) => `<button data-v="${k}" title="${esc(c.label)}">${c.icon} <span>${esc(c.label)}</span></button>`).join('');
   nav.querySelectorAll('button').forEach((b) => {
-    b.onclick = () => loadVehicle(b.dataset.v, firstType(b.dataset.v));
+    b.onclick = () => { crash?.close(); loadVehicle(b.dataset.v, firstType(b.dataset.v)); };
     b.classList.toggle('active', b.dataset.v === state.cat);
   });
 }
@@ -148,6 +151,7 @@ function loadVehicle(cat, type) {
     state.root = asm.object;
     state.rootNode = asm.node;
     scene.add(state.root);
+    if (crash?.active) state.root.visible = false; // le crash test occupe la scène
     state.meshes = [];
     state.root.traverse((o) => { if (o.isMesh) state.meshes.push(o); });
     // Téléphone : sans reflets d'environnement, les métaux paraîtraient noirs ; on les rend plus mats
@@ -179,7 +183,7 @@ function loadVehicle(cat, type) {
     setView('iso', false);
     $('#loading').style.display = 'none';
     console.info(`[Ghost] ${key} construit en ${Math.round(performance.now() - t0)} ms – ${parts.length} pièces`);
-    if (location.hash.slice(1) !== key) history.replaceState(null, '', `#${key}`);
+    if (location.hash.slice(1) !== key && !crash?.active) history.replaceState(null, '', `#${key}`);
     document.title = `${CATALOG[cat].types[type].label} – Ghost`;
   }, 10));
 }
@@ -766,7 +770,12 @@ $('#b-csv').onclick = () => {
 };
 $('#type-select').onchange = (e) => loadVehicle(state.cat, e.target.value);
 $('#layers').oninput = (e) => setPeel(+e.target.value);
-window.addEventListener('hashchange', () => { const [c, t] = parseHash(); if (`${c}/${t}` !== state.key) loadVehicle(c, t); });
+window.addEventListener('hashchange', () => {
+  if (location.hash === '#crash') { crash.open(); return; }
+  if (crash.active) crash.close();
+  const [c, t] = parseHash();
+  if (`${c}/${t}` !== state.key) loadVehicle(c, t);
+});
 
 // Boutons mobiles
 const mobileBar = document.createElement('div');
@@ -786,9 +795,18 @@ function setupAnimation() {
   if (anim.on) setAnimOn(false);
   anim.deg = 0;
   const ud = state.root.userData;
+  anim.title = ud.animTitle || null;
   if (ud.animate) { anim.fn = ud.animate; anim.phases = ud.phases || null; anim.info = ud.animInfo || ''; }
-  else anim.fn = genericAnimator(state.root);
-  if (!ud.animate) { anim.phases = null; anim.info = anim.fn ? 'Roues, hélices, rotors et soufflantes en rotation.' : ''; }
+  else {
+    // véhicule : roues, hélices… + moteur(s) intégré(s) qui ont leur propre cinématique
+    const wheels = genericAnimator(state.root);
+    const subs = [];
+    state.root.traverse((o) => { if (o !== state.root && o.userData.animate) subs.push(o.userData); });
+    anim.phases = subs[0]?.phases || null;
+    anim.title = subs[0]?.animTitle || null;
+    anim.fn = wheels || subs.length ? (deg) => { wheels?.(deg / 3); for (const u of subs) u.animate(deg); } : null;
+    anim.info = subs.length ? 'Le moteur tourne (vilebrequin, bielles, pistons, soupapes) ; les roues tournent 3 fois moins vite (boîte de vitesses).' : anim.fn ? 'Roues, hélices, rotors et soufflantes en rotation.' : '';
+  }
   $('#t-anim').hidden = !anim.fn;
   $('#anim-speed').hidden = !anim.fn;
 }
@@ -816,8 +834,19 @@ function genericAnimator(root) {
       add(o, anti ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(1, 0, 0), anti ? 3 : 2, centerIn(ref, o.parent));
     }
   });
-  if (!items.length) return null;
+  // Pistons de moteurs simplifiés (moto, avion léger…) : mouvement alterné le long de leur axe
+  const pist = [];
+  root.traverse((o) => {
+    if (!o.isMesh || !/^Piston \d+$/.test(o.name)) return;
+    for (let p = o.parent; p; p = p.parent) if (p.userData.animate) return;
+    o.geometry.computeBoundingBox();
+    const sz = o.geometry.boundingBox.getSize(new THREE.Vector3());
+    const ax = sz.x < sz.y && sz.x < sz.z ? 'x' : sz.y < sz.z ? 'y' : 'z';
+    pist.push({ o, ax, amp: Math.max(sz.x, sz.y, sz.z) * 0.55, ph: pist.length % 2 ? Math.PI : 0 });
+  });
+  if (!items.length && !pist.length) return null;
   return (deg) => {
+    for (const p of pist) { const v = new THREE.Vector3(); v[p.ax] = p.amp * Math.cos(deg * 3 * Math.PI / 180 + p.ph); p.o.userData.anim = { pos: v, quat: new THREE.Quaternion() }; }
     for (const it of items) {
       const R = new THREE.Quaternion().setFromAxisAngle(it.axis, deg * it.k * Math.PI / 180);
       const p0 = it.o.userData.base.pos;
@@ -840,11 +869,11 @@ function stepAnimation(now) {
   if (!anim.on || !anim.fn || !state.root) return;
   const dt = Math.min(0.1, (now - anim.last) / 1000);
   anim.last = now;
-  anim.deg = (anim.deg + dt * 120 * anim.speed) % 1440;
+  anim.deg = (anim.deg + dt * 120 * anim.speed) % 8640;
   anim.fn(anim.deg);
   applyExplode();
   const hud = $('#anim-hud');
-  let html = `<b>${state.root.userData.animTitle ? state.root.userData.animTitle(anim.deg) : 'Fonctionnement'}</b><div class="info">${esc(anim.info)}</div>`;
+  let html = `<b>${anim.title ? anim.title(anim.deg) : 'Fonctionnement'}</b><div class="info">${esc(anim.info)}</div>`;
   if (anim.phases) html += '<div class="ph">' + anim.phases(anim.deg).map((p) => `<span style="border-color:${p.color}"><i style="background:${p.color}"></i>${esc(p.label)} · ${esc(p.value)}</span>`).join('') + '</div>';
   hud.innerHTML = html;
 }
@@ -890,9 +919,36 @@ function setCutOn(v) {
   refreshMaterials();
 }
 
+// ============================================================================ Crash test
+const crash = createCrashLab({
+  scene, camera, controls, CATALOG, esc, nf, animateCamera,
+  onOpen: () => {
+    if (anim.on) setAnimOn(false);
+    if (cut.on) setCutOn(false);
+    if (dis.on) stopDisassembly(true);
+    select(null);
+    if (state.root) state.root.visible = false;
+    labelsGroup.visible = false; dimsGroup.visible = false;
+    $('#crash-btn').classList.add('active');
+    document.querySelectorAll('#vehicle-tabs button').forEach((b) => b.classList.remove('active'));
+    if (location.hash !== '#crash') history.replaceState(null, '', '#crash');
+  },
+  onClose: () => {
+    if (state.root) state.root.visible = true;
+    if (location.hash === '#crash' && state.key) history.replaceState(null, '', `#${state.key}`);
+    labelsGroup.visible = true; dimsGroup.visible = true;
+    $('#crash-btn').classList.remove('active');
+    document.querySelectorAll('#vehicle-tabs button').forEach((b) => b.classList.toggle('active', b.dataset.v === state.cat));
+    setView('iso');
+  },
+});
+$('#crash-btn').onclick = () => crash.toggle();
+if (location.hash === '#crash') setTimeout(() => crash.open(), 300);
+
 // Clavier
 window.addEventListener('keydown', (ev) => {
   if (ev.target.tagName === 'INPUT' || ev.target.tagName === 'SELECT') return;
+  if (crash.active) { if (ev.key === 'Escape') crash.close(); return; }
   if (ev.key === 'PageDown') { ev.preventDefault(); setPeel(state.peel + 1); return; }
   if (ev.key === 'PageUp') { ev.preventDefault(); setPeel(state.peel - 1); return; }
   const k = ev.key.toLowerCase();
@@ -1100,7 +1156,7 @@ controls.addEventListener('change', wake);
 function tick(now) {
   requestAnimationFrame(tick);
   if (LITE) {
-    if (explodeAnim || camAnim || disAnim || anim.on || !$('#loading').style.display.includes('none')) activeFrames = Math.max(activeFrames, 30);
+    if (explodeAnim || camAnim || disAnim || anim.on || crash.playing || !$('#loading').style.display.includes('none')) activeFrames = Math.max(activeFrames, 30);
     if (activeFrames <= 0) return;
     activeFrames--;
   }
@@ -1115,6 +1171,7 @@ function tick(now) {
   stepCamAnim(now);
   stepDisAnim(now);
   stepAnimation(now);
+  crash.update(now);
   controls.update();
   if (LITE) {
     // Sans tampon de profondeur logarithmique : plan proche ajusté à la distance pour éviter les scintillements
@@ -1145,7 +1202,7 @@ async function importFile(file) {
     const label = file.name.replace(/\.(glb|gltf)$/i, '');
     const t = {
       label, imported: true, tris: res.tris, opts: { unit: 1000, rotY: 90 },
-      desc: `Fichier ${file.name} – ${(file.size / 1048576).toFixed(1).replace('.', ',')} Mo – ${res.meshes} maillage(s)${res.animations ? ` – ${res.animations} animation(s) ignorée(s)` : ''}`,
+      desc: `Fichier ${file.name} – ${(file.size / 1048576).toFixed(1).replace('.', ',')} Mo – ${res.meshes} maillage(s)${res.animations ? ` – ${res.animations} animation(s) ignorée(s)` : ''}${res.skipped ? ` – ${res.skipped} forme(s) invalide(s) retirée(s)` : ''}`,
       makers: [],
     };
     t.build = () => gltfToAssembly(res.scene, { name: label, unit: t.opts.unit, rotY: t.opts.rotY });
@@ -1153,9 +1210,9 @@ async function importFile(file) {
     renderTabs();
     loadVehicle('import', id);
   } catch (err) {
-    console.error(err);
+    console.warn(err);
     $('#loading').style.display = 'none';
-    alert(`Impossible de lire ce fichier : ${err.message || err}\n\nUn .gltf qui référence des fichiers externes (.bin, textures) doit d'abord être converti en .glb.`);
+    alert(`Impossible de lire « ${file.name} » : ${err.message || err}\n\nAstuce : un .gltf qui référence des fichiers externes (.bin, textures) doit d'abord être converti en .glb.`);
   } finally {
     $('#loading').textContent = 'Construction du modèle…';
   }

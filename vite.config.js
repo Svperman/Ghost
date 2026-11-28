@@ -1,4 +1,7 @@
 import { defineConfig, loadEnv } from 'vite';
+import { createHash } from 'node:crypto';
+import { readFileSync, readdirSync } from 'node:fs';
+import { offlineWorker } from './src/offline/sw-template.js';
 
 // Pages HTML du site (application + pages légales + page d'erreur 404)
 const PAGES = ['index', 'mentions-legales', 'confidentialite', 'cgu', '404'];
@@ -25,6 +28,35 @@ function seoFiles(site) {
   };
 }
 
+/**
+ * Mode hors connexion : génère sw.js (service worker) avec la liste de TOUS les fichiers du site.
+ * À la première visite, le navigateur les enregistre ; ensuite Ghost fonctionne sans Internet.
+ * Le numéro de version change dès qu'un fichier change, ce qui déclenche la mise à jour.
+ */
+function offlineFiles() {
+  return {
+    name: 'ghost-offline',
+    enforce: 'post',
+    generateBundle(_, bundle) {
+      const hash = createHash('sha256');
+      const files = [];
+      for (const [name, item] of Object.entries(bundle)) {
+        if (name.endsWith('.map') || name === 'robots.txt' || name === 'sitemap.xml') continue;
+        files.push(name);
+        hash.update(name).update(item.type === 'chunk' ? item.code : item.source);
+      }
+      for (const name of readdirSync('public')) {
+        if (name === 'og-image.jpg') continue; // ne sert qu'aux aperçus sur les réseaux sociaux
+        files.push(name);
+        hash.update(name).update(readFileSync(`public/${name}`));
+      }
+      files.sort();
+      const version = hash.digest('hex').slice(0, 12);
+      this.emitFile({ type: 'asset', fileName: 'sw.js', source: offlineWorker(version, files) });
+    },
+  };
+}
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_');
   const site = (env.VITE_SITE_URL || 'https://ghost-explorateur.vercel.app').replace(/\/$/, '');
@@ -36,6 +68,6 @@ export default defineConfig(({ mode }) => {
       chunkSizeWarningLimit: 1500,
       rollupOptions: { input: Object.fromEntries(PAGES.map((p) => [p, `${p}.html`])) },
     },
-    plugins: [seoFiles(site)],
+    plugins: [seoFiles(site), offlineFiles()],
   };
 });

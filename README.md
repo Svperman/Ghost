@@ -5,13 +5,13 @@ chaque pièce, vis, écrou, rondelle ou rivet est un objet 3D **nommé**, avec s
 son matériau, sa norme et son couple de serrage. On peut le sélectionner, le chercher par son nom, le déplacer,
 le pivoter, l'isoler, et retirer les couches du véhicule **de l'extérieur jusqu'au châssis**.
 
-## Catalogue (52 types, ≈ 26 000 pièces)
+## Catalogue (65 types, ≈ 38 000 pièces)
 
 | Catégorie | Types |
 |---|---|
 | ✈️ Aéronefs | Monomoteur léger à aile haute · Avion de ligne biréacteur · Gros porteur long-courrier · Très gros porteur quadriréacteur · Jet d'affaires · Hélicoptère monoturbine |
 | 🚀 Espace | Lanceur lourd cryogénique + 2 boosters · Lanceur réutilisable 9 moteurs (jambes, grilles) · Moteur-fusée cryogénique détaillé |
-| ⚙️ Moteurs | 4 cylindres essence 1,6 L turbo · 6 cylindres diesel 12,8 L · V8 5,0 L · 4 cylindres à plat (boxer) – chaque piston, segment, soupape, clavette, coussinet et vis |
+| ⚙️ Moteurs (17) | Monocylindre 125 · Bicylindre en V · 3 cylindres turbo · 4 cylindres essence turbo · 4 cylindres moto · 5 cylindres (rare) · 6 cylindres diesel 12,8 L · V6 biturbo · V8 · V10 · V12 (rare) · Flat-4 boxer · Flat-6 · W16 (très rare) · Étoile 9 cylindres d'aviation (rare) · Rotatif Wankel birotor (rare) · Électrique synchrone 800 V (le plus récent) – chaque piston, segment, soupape, clavette, coussinet et vis, animés |
 | 🚗 Voitures | Citadine · Berline · Break · SUV 4×4 · Monospace 7 places · Coupé sportif · Pick-up double cabine · Électrique |
 | 🚐 Utilitaires | Fourgonnette · Fourgon L2H2 · Grand fourgon L4H3 propulsion à roues jumelées |
 | 🚚 Camions | Tracteur routier 4×2 · Tracteur 6×2 · Porteur benne 8×4 · Porteur fourgon 4×2 |
@@ -53,11 +53,33 @@ Chaque type indique des **constructeurs qui fabriquent ce type de véhicule** (e
 | I / H | Isoler / masquer |
 | Page ↓ / Page ↑ | Retirer / remettre une couche |
 | E | Vue éclatée |
-| P | **Fonctionnement** : moteurs (vilebrequin, bielles, pistons, cames et soupapes synchronisés, phase de chaque cylindre), fusées (séquence de vol), roues, hélices, rotors |
+| P | **Fonctionnement** : moteurs (y compris ceux intégrés aux voitures, camions, bus…) (vilebrequin, bielles, pistons, cames et soupapes synchronisés, phase de chaque cylindre), fusées (séquence de vol), roues, hélices, rotors |
 | K | **Coupe** : trancher le modèle selon X, Y ou Z, au millimètre près, pour voir l'intérieur |
 | X / W / C / L / M | Rayons X / filaire / cotes / étiquettes / mesure |
 | / | Aller à la recherche |
 | Échap | Désélectionner |
+
+## 💥 Crash test
+
+Onglet **Crash test** (barre du haut, ou adresse `#crash`) : simulation physique d'un choc, au ralenti.
+
+- Véhicule testé : toutes les voitures, utilitaires, camions et bus du catalogue (masse estimée, réglable).
+- Scénarios : frontal contre mur rigide, frontal décalé 40 % (barrière déformable), poteau / arbre, choc latéral contre poteau, contre un autre véhicule (au choix, à la vitesse voulue), choc arrière.
+- Réglages : vitesse(s), masse, ceinture, airbags, ralenti, caméra (côté, dessus, face, habitacle), carrosserie transparente.
+- Calcul (modèle 1D masses + ressorts d'écrasement plastiques, pas de 0,05 ms) : variation de vitesse, décélérations, écrasement, énergie, durée du choc, rebond ; mannequin retenu par la ceinture, l'airbag, la porte ou le dossier ; accélération thoracique 3 ms, HIC15, risque de blessure grave à la tête (Prasad-Mertz).
+- Rendu : carrosserie déformée sommet par sommet, phares et boucliers qui se détachent, pare-brise fissuré, airbag qui se gonfle, mannequin projeté.
+
+Modèle pédagogique : les ordres de grandeur sont proches des essais réels (≈ 40 g et 600 mm d'écrasement pour une berline à 56 km/h contre un mur) mais ce n'est pas un calcul homologué.
+
+## 📴 Mode hors connexion
+
+Après une première visite avec Internet, **tout Ghost fonctionne sans connexion** : les 65 types de véhicules, les moteurs animés, le crash test et les pages légales. Les modèles 3D sont calculés dans le navigateur, il n'y a donc aucun fichier lourd à télécharger (≈ 2,5 Mo au total).
+
+- Un bandeau signale la perte de connexion (« 📴 Hors connexion ») puis son retour.
+- Sur téléphone, **Ajouter à l'écran d'accueil** installe Ghost comme une application (icône, plein écran).
+- Quand une nouvelle version est publiée, un bandeau « ✨ Nouvelle version » propose de mettre à jour : la page ouverte n'est jamais remplacée sans votre accord.
+
+Fonctionnement : `vite build` génère `sw.js` (service worker, modèle dans `src/offline/sw-template.js`) avec la liste de tous les fichiers du site et un numéro de version calculé sur leur contenu. Le mode hors connexion n'est actif que sur la version construite (`npm run build` puis `npm run preview`), pas avec `npm run dev`.
 
 ## Importer un modèle 3D réel (.glb)
 
@@ -102,6 +124,9 @@ src/
   main.js            Vue 3D, sélection, arborescence, couches, éclaté, mesures, export
   catalog.js         Catalogue : catégories → types → générateurs
   style.css          Interface
+  crash.js           Crash test : scène, déformations, mannequin, graphiques
+  crash-physics.js   Crash test : modèle physique (masses-ressorts, retenue de l'occupant, HIC)
+  offline/           Mode hors connexion : modèle du service worker, bandeau d'état
   core/builder.js    Formes (vis, écrous, rivets, ressorts, profils d'aile…), matériaux, couches, nomenclature
   core/parts.js      Sous-ensembles réutilisables : roues, moteur en ligne, sièges
   vehicles/
