@@ -241,3 +241,15 @@ body.crash-mode #sidebar, body.crash-mode #details, body.crash-mode #toolbar, bo
   #crash-panel { top: auto; height: 52vh; width: 100%; border-left: none; border-top: 1px solid var(--line); }
   #crash-btn span { display: none; }
 }
+
+/* ---------------------------------------------------------------- Mode hors connexion */
+#net-status { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 30; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center;
+  width: max-content; max-width: min(560px, calc(100% - 32px)); box-sizing: border-box; padding: 8px 14px; border-radius: 10px; border: 1px solid var(--line); background: rgba(22,26,32,.96); box-shadow: 0 6px 24px rgba(0,0,0,.4); font-size: 13px; text-align: center; }
+#net-status[hidden] { display: none; }
+#net-status span { color: var(--muted); }
+#net-status button { background: var(--accent-strong); border-color: var(--accent); color: #fff; padding: 4px 12px; }
+#net-status.net-off { border-color: var(--accent-2); }
+#net-status.net-off b { color: var(--accent-2); }
+#net-status.net-on { border-color: #2fbf71; }
+#net-status.compact { padding: 4px 10px; font-size: 12px; opacity: .9; }
+body.crash-mode #net-status { top: 64px; }

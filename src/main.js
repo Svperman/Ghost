@@ -7,6 +7,7 @@ import './style.css';
 import { inject } from '@vercel/analytics';
 import { CATALOG, DEFAULT_TYPE } from './catalog.js';
 import { createCrashLab } from './crash.js';
+import './offline/status.js';
 import { LAYERS } from './core/builder.js';
 
 const LAYER_STEPS = ['Tout afficher', 'Sans carrosserie', 'Sans intérieur', 'Sans mécanique', 'Châssis seul'];
@@ -97,8 +98,9 @@ const explodeT = () => state.explode * 1.4;
 // ============================================================================ Chargement d'un véhicule
 function parseHash() {
   const [c, t] = location.hash.slice(1).split('/');
-  const cat = CATALOG[c] ? c : 'voiture';
-  const type = CATALOG[cat].types[t] ? t : firstType(cat);
+  // Object.hasOwn : « #constructor » ou « #voiture/toString » ne doivent pas passer pour des véhicules
+  const cat = Object.hasOwn(CATALOG, c) ? c : 'voiture';
+  const type = Object.hasOwn(CATALOG[cat].types, t) ? t : firstType(cat);
   return [cat, type];
 }
 function fillTypeSelect(cat, type) {
@@ -181,7 +183,7 @@ function loadVehicle(cat, type) {
     setView('iso', false);
     $('#loading').style.display = 'none';
     console.info(`[Ghost] ${key} construit en ${Math.round(performance.now() - t0)} ms – ${parts.length} pièces`);
-    if (location.hash.slice(1) !== key) history.replaceState(null, '', `#${key}`);
+    if (location.hash.slice(1) !== key && !crash?.active) history.replaceState(null, '', `#${key}`);
     document.title = `${CATALOG[cat].types[type].label} – Ghost`;
   }, 10));
 }
@@ -768,7 +770,12 @@ $('#b-csv').onclick = () => {
 };
 $('#type-select').onchange = (e) => loadVehicle(state.cat, e.target.value);
 $('#layers').oninput = (e) => setPeel(+e.target.value);
-window.addEventListener('hashchange', () => { const [c, t] = parseHash(); if (`${c}/${t}` !== state.key) loadVehicle(c, t); });
+window.addEventListener('hashchange', () => {
+  if (location.hash === '#crash') { crash.open(); return; }
+  if (crash.active) crash.close();
+  const [c, t] = parseHash();
+  if (`${c}/${t}` !== state.key) loadVehicle(c, t);
+});
 
 // Boutons mobiles
 const mobileBar = document.createElement('div');
@@ -924,9 +931,11 @@ const crash = createCrashLab({
     labelsGroup.visible = false; dimsGroup.visible = false;
     $('#crash-btn').classList.add('active');
     document.querySelectorAll('#vehicle-tabs button').forEach((b) => b.classList.remove('active'));
+    if (location.hash !== '#crash') history.replaceState(null, '', '#crash');
   },
   onClose: () => {
     if (state.root) state.root.visible = true;
+    if (location.hash === '#crash' && state.key) history.replaceState(null, '', `#${state.key}`);
     labelsGroup.visible = true; dimsGroup.visible = true;
     $('#crash-btn').classList.remove('active');
     document.querySelectorAll('#vehicle-tabs button').forEach((b) => b.classList.toggle('active', b.dataset.v === state.cat));
@@ -1193,7 +1202,7 @@ async function importFile(file) {
     const label = file.name.replace(/\.(glb|gltf)$/i, '');
     const t = {
       label, imported: true, tris: res.tris, opts: { unit: 1000, rotY: 90 },
-      desc: `Fichier ${file.name} – ${(file.size / 1048576).toFixed(1).replace('.', ',')} Mo – ${res.meshes} maillage(s)${res.animations ? ` – ${res.animations} animation(s) ignorée(s)` : ''}`,
+      desc: `Fichier ${file.name} – ${(file.size / 1048576).toFixed(1).replace('.', ',')} Mo – ${res.meshes} maillage(s)${res.animations ? ` – ${res.animations} animation(s) ignorée(s)` : ''}${res.skipped ? ` – ${res.skipped} forme(s) invalide(s) retirée(s)` : ''}`,
       makers: [],
     };
     t.build = () => gltfToAssembly(res.scene, { name: label, unit: t.opts.unit, rotY: t.opts.rotY });
@@ -1201,9 +1210,9 @@ async function importFile(file) {
     renderTabs();
     loadVehicle('import', id);
   } catch (err) {
-    console.error(err);
+    console.warn(err);
     $('#loading').style.display = 'none';
-    alert(`Impossible de lire ce fichier : ${err.message || err}\n\nUn .gltf qui référence des fichiers externes (.bin, textures) doit d'abord être converti en .glb.`);
+    alert(`Impossible de lire « ${file.name} » : ${err.message || err}\n\nAstuce : un .gltf qui référence des fichiers externes (.bin, textures) doit d'abord être converti en .glb.`);
   } finally {
     $('#loading').textContent = 'Construction du modèle…';
   }

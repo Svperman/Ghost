@@ -71,6 +71,16 @@ Onglet **Crash test** (barre du haut, ou adresse `#crash`) : simulation physique
 
 Modèle pédagogique : les ordres de grandeur sont proches des essais réels (≈ 40 g et 600 mm d'écrasement pour une berline à 56 km/h contre un mur) mais ce n'est pas un calcul homologué.
 
+## 📴 Mode hors connexion
+
+Après une première visite avec Internet, **tout Ghost fonctionne sans connexion** : les 65 types de véhicules, les moteurs animés, le crash test et les pages légales. Les modèles 3D sont calculés dans le navigateur, il n'y a donc aucun fichier lourd à télécharger (≈ 2,5 Mo au total).
+
+- Un bandeau signale la perte de connexion (« 📴 Hors connexion ») puis son retour.
+- Sur téléphone, **Ajouter à l'écran d'accueil** installe Ghost comme une application (icône, plein écran).
+- Quand une nouvelle version est publiée, un bandeau « ✨ Nouvelle version » propose de mettre à jour : la page ouverte n'est jamais remplacée sans votre accord.
+
+Fonctionnement : `vite build` génère `sw.js` (service worker, modèle dans `src/offline/sw-template.js`) avec la liste de tous les fichiers du site et un numéro de version calculé sur leur contenu. Le mode hors connexion n'est actif que sur la version construite (`npm run build` puis `npm run preview`), pas avec `npm run dev`.
+
 ## Importer un modèle 3D réel (.glb)
 
 Bouton **📦 Importer** (ou glisser-déposer le fichier dans la vue). Formats : glTF binaire `.glb`, ou `.gltf` autonome ;
@@ -114,6 +124,9 @@ src/
   main.js            Vue 3D, sélection, arborescence, couches, éclaté, mesures, export
   catalog.js         Catalogue : catégories → types → générateurs
   style.css          Interface
+  crash.js           Crash test : scène, déformations, mannequin, graphiques
+  crash-physics.js   Crash test : modèle physique (masses-ressorts, retenue de l'occupant, HIC)
+  offline/           Mode hors connexion : modèle du service worker, bandeau d'état
   core/builder.js    Formes (vis, écrous, rivets, ressorts, profils d'aile…), matériaux, couches, nomenclature
   core/parts.js      Sous-ensembles réutilisables : roues, moteur en ligne, sièges
   vehicles/

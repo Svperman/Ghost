@@ -19,10 +19,28 @@ function getLoader() {
 
 /** Lit un fichier (File) et renvoie la scène glTF */
 export async function readModelFile(file) {
+  if (!file.size) throw new Error('Le fichier est vide.');
   const buf = await file.arrayBuffer();
-  const gltf = await getLoader().parseAsync(buf, '');
+  let gltf;
+  try {
+    gltf = await getLoader().parseAsync(buf, '');
+  } catch (err) {
+    // Message compréhensible à la place de l'erreur technique du lecteur glTF
+    console.warn('Lecture glTF impossible :', err);
+    const head = new TextDecoder().decode(new Uint8Array(buf, 0, Math.min(4, buf.byteLength)));
+    if (head !== 'glTF' && !/^\s*\{/.test(head)) throw new Error('Ce fichier n\'est pas un modèle 3D glTF (.glb), même s\'il en porte l\'extension.');
+    throw new Error('Le modèle 3D est endommagé ou utilise une option non prise en charge.');
+  }
   const scene = gltf.scene || gltf.scenes?.[0];
   if (!scene) throw new Error('Aucune scène dans le fichier.');
+  // Les formes aux coordonnées invalides (NaN, infini) sont retirées : elles rendraient la vue et les cotes inutilisables
+  const bad = [];
+  scene.traverse((o) => {
+    if (!o.isMesh) return;
+    const pos = o.geometry?.attributes?.position;
+    if (!pos || !pos.count || !pos.array.every(Number.isFinite)) bad.push(o);
+  });
+  for (const o of bad) o.removeFromParent();
   let meshes = 0, tris = 0;
   scene.traverse((o) => {
     if (!o.isMesh) return;
@@ -30,8 +48,8 @@ export async function readModelFile(file) {
     const g = o.geometry;
     tris += (g.index ? g.index.count : g.attributes.position.count) / 3;
   });
-  if (!meshes) throw new Error('Le fichier ne contient aucun maillage.');
-  return { scene, meshes, tris: Math.round(tris), animations: gltf.animations?.length || 0 };
+  if (!meshes) throw new Error(bad.length ? 'Les formes du fichier ont des coordonnées invalides : rien ne peut être affiché.' : 'Le fichier ne contient aucun maillage.');
+  return { scene, meshes, tris: Math.round(tris), animations: gltf.animations?.length || 0, skipped: bad.length };
 }
 
 // Couche d'épluchage devinée d'après le nom (français / anglais)
